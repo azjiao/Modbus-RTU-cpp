@@ -164,7 +164,7 @@ void Port_RTU::portRTU_Init(void)
 //RTU_DataCtrl构造函数
 RTU_DataCtrl::RTU_DataCtrl(u32 unBR, u16 usDB, u16 usSB, u16 usPt) : \
                    Port_RTU(unBR, usDB,usSB, usPt)
-{    
+{
     //清空数据缓冲区.
     usRXIndex = usTXIndex = 0;
 }
@@ -247,12 +247,13 @@ void RTU_DataCtrl::SendFrame(void)
         while(USART_GetFlagStatus(USART2,USART_FLAG_TXE) != SET);
     }
     //等待全部连续数据发送完毕。
-    while(USART_GetFlagStatus(USART2, USART_FLAG_TC) != SET);        
+    while(USART_GetFlagStatus(USART2, USART_FLAG_TC) != SET);
     //帧间延时，开启t3.5。
     //延时结束会使bBusy复位。
-    T15_35.timer_ResetONOFF(bTimerStart);
+    //T15_35.timer_ResetONOFF(bTimerStart);
+    timeFrameEnd_Start();
     //等待帧间隔结束。
-    while(modbusStatus.bBusy);
+    while(portStatus.bBusy);
     LED0_OFF;
 }
 

@@ -17,11 +17,11 @@ RTU_Slave::RTU_Slave(RTU_DataCtrl* ptr, u8 ucAddr) : ucNodeAddr(ucAddr)
 void RTU_Slave::slaveService(void)
 {
     //如果接收到了数据帧.
-    if(RTU_PORT.modbusStatus.bReadEnb)
+    if(RTU_PORT.portStatus.bReadEnb)
     {
         //如果无错则解析
         //当帧可读时其实bErr为false，可以取消判断。
-        if(!RTU_PORT.modbusStatus.bErr)
+        if(!RTU_PORT.portStatus.bErr)
         {
             //首先判断从站地址是否相符。
             //站地址不符则放弃,重启接收。

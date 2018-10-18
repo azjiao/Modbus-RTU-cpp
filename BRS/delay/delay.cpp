@@ -2,6 +2,8 @@
 //#include <core_cm3.h>
 #include "delay.h"
 
+SysTick_TimerType Timer;
+
 // 以1ms设置SysTick.
 void delay_Init(void)
 {
@@ -11,9 +13,6 @@ void delay_Init(void)
         while(1);
     }
 }
-
-
-
 
 // ms级delay.
 void delay_ms(u32 utime_ms)
@@ -49,7 +48,7 @@ bool TimeON(bool bEnb, u32 uPt, TimerType *timer)
     }
     else{
         //if((timer->uEt < uPt) && ((Timer.bPlus_ms) & (Timer.bPlus_ms ^ timer->bTemp)))
-        //每次检测到边沿(每1ms翻转一次)就加1.
+        //每次检测到边沿(每1ms翻转一次)就加1.        
         if((timer->uEt < uPt) && (Timer.bPlus_ms ^ timer->bTemp))
             timer->uEt++;
 
@@ -91,3 +90,5 @@ uint16_t TimeACC(bool bEnb, TimerType *timer)
     return timer->uEt;
 }
 
+
+        

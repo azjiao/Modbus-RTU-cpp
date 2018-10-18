@@ -34,13 +34,13 @@ typedef  struct
 {
     bool bMode;  //处于bTXMode:发送模式,还是bRXMode:接收状态.
     bool bReadEnb; //接收到的帧可读取标识。0：不可读取；1：可读取。
-    bool bDone;  //主站一次通讯完成，数据可读取。1:回传的数据可以读取。
+//    bool bDone;  //主站一次通讯完成，数据可读取。1:回传的数据可以读取。
     bool bBusy;         //忙。对于接收，接收开始不一定忙。
     bool bErr;          //接收帧有错误.
     bool bTimeOut;  //应答超时。 可归并到usErr中.
-    u16  usErr;     //通讯错误信息.0:无错;1:非本站信息(主站不用错误1);2:帧CRC错误;3:字节接收出错.
+    u16  usErr;     //通讯错误信息.0:无错;1:非本站信息(主站不用错误1);2:帧CRC错误;3:字节接收出错,4:接收超时。
     u32  unErrCount;  //校验失败计数。
-}ModbusStatus_Struct;
+}PortStatus_Struct;
 
 //----------------------------------------------------------------------------------
 //RS485端口类：用于初始化485端口。
@@ -56,8 +56,8 @@ class Port_RS485
         Port_RS485(u32 unBR, u16 usDB, u16 usSB, u16 usPt);
         ~Port_RS485(){};
 
-        u32  getBaudRate() { return RS485Init.unBaudRate;}  //获取波特率.       
-        void setPortParam(u32 unBR, u16 usDB, u16 usSB, u16 usPt);  //修改端口初始化数据.        
+        u32  getBaudRate() { return RS485Init.unBaudRate;}  //获取波特率.
+        void setPortParam(u32 unBR, u16 usDB, u16 usSB, u16 usPt);  //修改端口初始化数据.
         void RS485_Init(void);  //设置485口的硬件和通讯特性参数。
 };
 
@@ -71,14 +71,13 @@ class Port_RTU : Port_RS485
         u8  ucT15_35No;  //t1.5和t3.5所共用的定时器编号.由于t1.5和t3.5并不同时工作，可以设置使用同一个定时器。
         u8  ucTrespNo;  //超时定时器编号.
 
+        static BaseTimer T15_35;    //t1.5和t3.5共用定时器.
+        static BaseTimer Trespond;  //超时定时器.
+
     public:
         Port_RTU(u32 unBR, u16 usDB, u16 usSB, u16 usPt);
         ~Port_RTU(){};
 
-        //以下两个定时器,由于需要在中断里面来控制,所以设计成public.
-        static BaseTimer T15_35;    //t1.5和t3.5共用定时器.
-        static BaseTimer Trespond;  //超时定时器.
-            
         void timeRespTimeOut_Stop(void){Trespond.timer_ResetONOFF(bTimerStop);};
         void timeRespTimeOut_Start(void){Trespond.timer_ResetONOFF(bTimerStart);};
         void timeFrameEnd_Start(void) {T15_35.timer_ResetONOFF(bTimerStart);};
@@ -103,7 +102,7 @@ class Port_RTU : Port_RS485
 //Modbus_RTU端口数据收发控制类.
 class RTU_DataCtrl : public Port_RTU
 {
-    private:        
+    private:
         //生成CRC校验字
         u16 CRC16Gen(u8* ucPtr, u16 usLen);
         //CRC16校验
@@ -113,21 +112,19 @@ class RTU_DataCtrl : public Port_RTU
         //复位状态字准备接收数据帧
         void resetStatus4RX(void)
         {
-            modbusStatus.bReadEnb = false;  //复位数据可读取标识。
-            modbusStatus.bDone = false;     //复位通讯完成标识.
-            modbusStatus.bErr = false;
-            modbusStatus.bTimeOut = false;
-            modbusStatus.bMode = bRXMode;  //处于接收状态,以便在接收一帧后校验CRC.
-            modbusStatus.bBusy = false;  //设置系统状态进入空闲.
+            portStatus.bReadEnb = false;  //复位数据可读取标识。
+            portStatus.bErr = false;
+            portStatus.bTimeOut = false;
+            portStatus.bMode = bRXMode;  //处于接收状态,以便在接收一帧后校验CRC.
+            portStatus.bBusy = false;  //设置系统状态进入空闲.
         };
         //复位状态字准备发送数据帧
         void resetStatus4TX(void)
         {
-            modbusStatus.bDone = false;     //复位通讯完成标识。
-            modbusStatus.bErr = false;
-            modbusStatus.bTimeOut = false;
-            modbusStatus.bMode = bTXMode;  //处于发送状态.
-            modbusStatus.bBusy = true;  //设置系统状态进入空闲.
+            portStatus.bErr = false;
+            portStatus.bTimeOut = false;
+            portStatus.bMode = bTXMode;  //处于发送状态.
+            portStatus.bBusy = true;  //设置系统状态进入空闲.
         };
     public:
         RTU_DataCtrl(u32 unBR = BAUDRATE, u16 usDB = DATABIT, u16 usSB = STOPBIT, u16 usPt = PARITY);
@@ -137,13 +134,13 @@ class RTU_DataCtrl : public Port_RTU
         u8 RXBuffer[usFRAME_MAXLEN];  //接收缓冲区
         u16 usRXIndex;  //接收缓冲区当前索引
         u8 TXBuffer[usFRAME_MAXLEN];  //发送缓冲区
-        u16 usTXIndex;  //发送缓冲区当前索引            
-        ModbusStatus_Struct  modbusStatus;  //通讯状态字,外部中断等需要设置状态字,所以设置为public.
-            
-        //使用给定参数初始化端口，也用于无参数初始化(使用缺省参数).    
+        u16 usTXIndex;  //发送缓冲区当前索引
+        PortStatus_Struct  portStatus;  //通讯状态字,外部中断等需要设置状态字,所以设置为public.
+
+        //使用给定参数初始化端口，也用于无参数初始化(使用缺省参数).
         void RTU_Init(u32 unBR = BAUDRATE, u16 usDB = DATABIT, u16 usSB = STOPBIT, u16 usPt = PARITY)
         {
-            portRTU_Init(unBR, usDB, usSB, usPt);            
+            portRTU_Init(unBR, usDB, usSB, usPt);
         };
         u16  CRC16Gen(void);  //默认使用TXBuffer作为生成校验码的数据.
         bool CRC16Check(void);  //默认使用RXBuffer作为检查校验码是否正确的数据.

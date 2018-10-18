@@ -5,6 +5,12 @@
 //RTU_Master 构造函数。
 RTU_Master::RTU_Master(RTU_DataCtrl* ptr)
 {
+    masterStatus.bBusy = false;
+    masterStatus.bDone = false;
+    masterStatus.bErr = false;
+    masterStatus.bTimeOut = false;
+    masterStatus.usErrMsg = 0;
+    masterStatus.unErrCount = 0;
     pRTUPort = ptr;
 }
 
@@ -152,7 +158,7 @@ void RTU_Master::printBuff(void)
 //usNum:数据byte长度,可能是读取的元件数量，也可能是写入的元件数量。
 //ucPtr:从站回传数据缓冲区或待发送的赋值数据。
 void RTU_Master::master(u8 ucNodeAddr, bool bMode_RW, u16 usDataAddr, u16 usNum)
-{
+{    
     //判断元件类型:HoldReg,标识为4xxxx.
     if(usDataAddr >= 40000 && usDataAddr < 50000)
     {
@@ -208,51 +214,69 @@ void RTU_Master::master(u8 ucNodeAddr, bool bMode_RW, u16 usDataAddr, u16 usNum)
 //写多个连续的保持寄存器。
 void RTU_Master::masterFunc_0x10(u8 ucNodeAddr, u16 usDataAddr, u16 usNum)
 {
-    //元件基址 4xxxx
-    u16 Addr = usDataAddr - 40000;
-
-    //发送数据打包为数据帧。
-    enCode_0x10(ucNodeAddr, Addr, usNum);
-    //发送
-    RTU_PORT.SendFrame();
-    //发送后转入接收。
-    RTU_PORT.ReceiveFrame();
-
-    //应答超时监测使能。
-    RTU_PORT.timeRespTimeOut_Start();
-    //等待接收：转入接收不一定通讯接口忙，所以还必须或上是否可读。
-    while((RTU_PORT.modbusStatus.bBusy || !RTU_PORT.modbusStatus.bReadEnb) && !RTU_PORT.modbusStatus.bTimeOut);
-    //test
-    if(RTU_PORT.modbusStatus.bTimeOut)
+    static bool bWaitReceive = false;
+    if(!bWaitReceive)
     {
-        RTU_PORT.modbusStatus.unErrCount++;//通讯错误次数统计。
-        printf("F0x10接收超时!\n");
+        masterStatus.bDone = false;
+        //元件基址 4xxxx
+        u16 Addr = usDataAddr - 40000;
+
+        //发送数据打包为数据帧。
+        enCode_0x10(ucNodeAddr, Addr, usNum);
+        //发送
+        RTU_PORT.SendFrame();
+        //发送后转入接收。
+        RTU_PORT.ReceiveFrame();
+
+        //应答超时监测使能。
+        RTU_PORT.timeRespTimeOut_Start();
+        bWaitReceive = true;
     }
-
-    //接收后解析
-    //如果应答超时则不解析,处理下个事务（重发或进行下一帧发送）。
-    if(RTU_PORT.modbusStatus.bReadEnb && !RTU_PORT.modbusStatus.bTimeOut)
+    else
     {
-        //如果无错则对帧进行解码。
-        if(!RTU_PORT.modbusStatus.bErr)
+        //等待接收：转入接收不一定通讯接口忙，所以还必须或上是否可读。
+        //FIXME:纯粹的等待，需要改变。
+        //while((!RTU_PORT.portStatus.bReadEnb) && !RTU_PORT.portStatus.bTimeOut);
+        //test
+        if(RTU_PORT.portStatus.bTimeOut)
         {
-            //如果返回数据不符。
-            if(!unCode_0x10(ucNodeAddr))
-            {
-                //test
-                printf("F0x10返回帧含出错信息或不是所需从站返回帧 \n\n\n\n");
-                Usart_SendFrame(USART1, User_DataBuffer.ucData, User_DataBuffer.usIndex);
-                printf("\n");
-            }
-            //返回正确。
-            else{
-                //置位完成。写操作不需要转储返回的其他数据。
-                RTU_PORT.modbusStatus.bDone = true;
-            }
+            masterStatus.unErrCount++;//通讯错误次数统计。
+            masterStatus.bErr = true;
+            masterStatus.usErrMsg = 4;
+            masterStatus.bTimeOut = true;
+            printf("F0x10接收超时!\n");
+            bWaitReceive = false;
         }
-        //如果出错：CRC校验失败。
-        else
-            printf("F0x10返回帧CRC16校验失败！\n");
+
+        //接收后解析
+        //如果应答超时则不解析,处理下个事务（重发或进行下一帧发送）。
+        if(RTU_PORT.portStatus.bReadEnb && !RTU_PORT.portStatus.bTimeOut)
+        {
+            //如果无错则对帧进行解码。
+            if(!RTU_PORT.portStatus.bErr)
+            {
+                //如果返回数据不符。
+                if(!unCode_0x10(ucNodeAddr))
+                {
+                    //test
+                    printf("F0x10返回帧含出错信息或不是所需从站返回帧 \n\n\n\n");
+                    Usart_SendFrame(USART1, User_DataBuffer.ucData, User_DataBuffer.usIndex);
+                    printf("\n");
+                }
+                //返回正确。
+                else{
+                    //置位完成。写操作不需要转储返回的其他数据。
+                    masterStatus.bDone = true;
+                }
+            }
+            //如果出错：CRC校验失败。
+            else
+            {
+                printf("F0x10返回帧CRC16校验失败！\n");
+            }
+            bWaitReceive = false;
+        }
+        //FIXME:如果接收错误，如何把错误信息传递到master中来?
     }
 }
 
@@ -327,50 +351,63 @@ bool RTU_Master::unCode_0x10(u8 ucNodeAddr)
 //读多个连续的保持寄存器。
 void RTU_Master::masterFunc_0x03(u8 ucNodeAddr, u16 usDataAddr, u16 usNum)
 {
-    //元件基址:4xxxx
-    u16 Addr = usDataAddr - 40000;
-
-    //发送数据打包为数据帧。
-    enCode_0x03(ucNodeAddr, Addr, usNum);
-    //发送
-    RTU_PORT.SendFrame();
-    //发送后转入接收。
-    RTU_PORT.ReceiveFrame();
-    //应答超时监测使能。
-    RTU_PORT.timeRespTimeOut_Start();
-    //等待接收：转入接收不一定通讯接口忙，所以还必须或上是否可读。
-    while((RTU_PORT.modbusStatus.bBusy || !RTU_PORT.modbusStatus.bReadEnb) && !RTU_PORT.modbusStatus.bTimeOut);
-    //test
-    if(RTU_PORT.modbusStatus.bTimeOut)
+    static bool bWaitReceive = false;
+    if(!bWaitReceive)
     {
-        RTU_PORT.modbusStatus.unErrCount++;//通讯错误次数统计。
-        printf("F0x10接收超时!\n");
+        masterStatus.bDone = false;
+        //元件基址:4xxxx
+        u16 Addr = usDataAddr - 40000;
+
+        //发送数据打包为数据帧。
+        enCode_0x03(ucNodeAddr, Addr, usNum);
+        //发送
+        RTU_PORT.SendFrame();
+        //发送后转入接收。
+        RTU_PORT.ReceiveFrame();
+        //应答超时监测使能。
+        RTU_PORT.timeRespTimeOut_Start();
+        bWaitReceive = true;
     }
-
-    //接收后解析
-    //如果应答超时则不解析,处理下个事务（重发或进行下一帧发送）。
-    if(RTU_PORT.modbusStatus.bReadEnb && !RTU_PORT.modbusStatus.bTimeOut)
+    else
     {
-        //如果无错则对帧进行解码。
-        if(!RTU_PORT.modbusStatus.bErr)
+        //等待接收：转入接收不一定通讯接口忙，所以还必须或上是否可读。
+        //while((!RTU_PORT.portStatus.bReadEnb) && !RTU_PORT.portStatus.bTimeOut);
+        //test
+        if(RTU_PORT.portStatus.bTimeOut)
         {
-            //如果返回数据不符。
-            if(!unCode_0x03(ucNodeAddr))
-            {
-                //test
-                printf("F0x03返回帧含出错信息或不是所需从站返回帧 \n\n\n\n");
-                Usart_SendFrame(USART1, User_DataBuffer.ucData, User_DataBuffer.usIndex);
-                printf("\n");
-            }
-            //返回正确，数据已经转储在指定存储区。
-            else{
-                //置位数据可读取标识。
-                RTU_PORT.modbusStatus.bDone = true;
-            }
+            RTU_PORT.portStatus.unErrCount++;//通讯错误次数统计。
+            printf("F0x10接收超时!\n");
+            bWaitReceive = false;
         }
-        //如果出错：CRC校验失败。
-        else
-            printf("F0x03返回帧CRC16校验失败！\n");
+
+        //接收后解析
+        //如果应答超时则不解析,处理下个事务（重发或进行下一帧发送）。
+        if(RTU_PORT.portStatus.bReadEnb && !RTU_PORT.portStatus.bTimeOut)
+        {
+            //如果无错则对帧进行解码。
+            if(!RTU_PORT.portStatus.bErr)
+            {
+                //如果返回数据不符。
+                if(!unCode_0x03(ucNodeAddr))
+                {
+                    //test
+                    printf("F0x03返回帧含出错信息或不是所需从站返回帧 \n\n\n\n");
+                    Usart_SendFrame(USART1, User_DataBuffer.ucData, User_DataBuffer.usIndex);
+                    printf("\n");
+                }
+                //返回正确，数据已经转储在指定存储区。
+                else{
+                    //置位数据可读取标识。
+                    masterStatus.bDone = true;
+                }
+            }
+            //如果出错：CRC校验失败。
+            else
+            {
+                printf("F0x03返回帧CRC16校验失败！\n");
+            }
+            bWaitReceive = false;
+        }
     }
 }
 
@@ -440,50 +477,64 @@ bool RTU_Master::unCode_0x03(u8 ucNodeAddr)
 //读AI:输入存储器
 void RTU_Master::masterFunc_0x04(u8 ucNodeAddr, u16 usDataAddr, u16 usNum)
 {
-    //元件基址:3xxxx
-    u16 Addr = usDataAddr - 30000;
-
-    //发送数据打包为数据帧。
-    enCode_0x04(ucNodeAddr, Addr, usNum);
-    //发送
-    RTU_PORT.SendFrame();
-    //发送后转入接收。
-    RTU_PORT.ReceiveFrame();
-    //应答超时监测使能。
-    RTU_PORT.timeRespTimeOut_Start();
-    //等待接收：转入接收不一定通讯接口忙，所以还必须或上是否可读。
-    while((RTU_PORT.modbusStatus.bBusy || !RTU_PORT.modbusStatus.bReadEnb) && !RTU_PORT.modbusStatus.bTimeOut);
-    //test
-    if(RTU_PORT.modbusStatus.bTimeOut)
+    static bool bWaitReceive = false;
+    if(!bWaitReceive)
     {
-        RTU_PORT.modbusStatus.unErrCount++;//通讯错误次数统计。
-        printf("F0x10接收超时!\n");
+        masterStatus.bDone = false;
+        //元件基址:3xxxx
+        u16 Addr = usDataAddr - 30000;
+
+        //发送数据打包为数据帧。
+        enCode_0x04(ucNodeAddr, Addr, usNum);
+        //发送
+        RTU_PORT.SendFrame();
+        //发送后转入接收。
+        RTU_PORT.ReceiveFrame();
+        //应答超时监测使能。
+        RTU_PORT.timeRespTimeOut_Start();
+        bWaitReceive = true;
     }
-
-    //接收后解析
-    //如果应答超时则不解析,处理下个事务（重发或进行下一帧发送）。
-    if(RTU_PORT.modbusStatus.bReadEnb && !RTU_PORT.modbusStatus.bTimeOut)
+    else
     {
-        //如果无错则对帧进行解码。
-        if(!RTU_PORT.modbusStatus.bErr)
+        //等待接收：转入接收不一定通讯接口忙，所以还必须或上是否可读。
+        while((!RTU_PORT.portStatus.bReadEnb) && !RTU_PORT.portStatus.bTimeOut);
+        //test
+        if(RTU_PORT.portStatus.bTimeOut)
         {
-            //如果返回数据不符。
-            if(!unCode_0x04(ucNodeAddr))
-            {
-                //test
-                printf("F0x04返回帧含出错信息或不是所需从站返回帧 \n\n\n\n");
-                Usart_SendFrame(USART1, User_DataBuffer.ucData, User_DataBuffer.usIndex);
-                printf("\n");
-            }
-            //返回正确，数据已经转储在指定存储区。
-            else{
-                //置位数据可读取标识。
-                RTU_PORT.modbusStatus.bDone = true;
-            }
+            RTU_PORT.portStatus.unErrCount++;//通讯错误次数统计。
+            printf("F0x10接收超时!\n");
+            bWaitReceive = false;
         }
-        //如果出错：CRC校验失败。
-        else
-            printf("F0x04返回帧CRC16校验失败！\n");
+
+        //接收后解析
+        //如果应答超时则不解析,处理下个事务（重发或进行下一帧发送）。
+        if(RTU_PORT.portStatus.bReadEnb && !RTU_PORT.portStatus.bTimeOut)
+        {
+            //如果无错则对帧进行解码。
+            if(!RTU_PORT.portStatus.bErr)
+            {
+                //如果返回数据不符。
+                if(!unCode_0x04(ucNodeAddr))
+                {
+                    //test
+                    printf("F0x04返回帧含出错信息或不是所需从站返回帧 \n\n\n\n");
+                    Usart_SendFrame(USART1, User_DataBuffer.ucData, User_DataBuffer.usIndex);
+                    printf("\n");
+                }
+                //返回正确，数据已经转储在指定存储区。
+                else{
+                    //置位数据可读取标识。
+                    masterStatus.bDone = true;
+                }
+            }
+            //如果出错：CRC校验失败。
+            else
+            {
+
+                printf("F0x04返回帧CRC16校验失败！\n");
+            }
+            bWaitReceive = false;
+        }
     }
 }
 
@@ -553,50 +604,65 @@ bool RTU_Master::unCode_0x04(u8 ucNodeAddr)
 //读多个连续的输入离散量DI
 void RTU_Master::masterFunc_0x02(u8 ucNodeAddr, u16 usDataAddr, u16 usNum)
 {
-    //元件基址:1xxxx
-    u16 Addr = usDataAddr - 10000;
-
-    //发送数据打包为数据帧。
-    enCode_0x02(ucNodeAddr, Addr, usNum);
-    //发送
-    RTU_PORT.SendFrame();
-    //发送后转入接收。
-    RTU_PORT.ReceiveFrame();
-    //应答超时监测使能。
-    RTU_PORT.timeRespTimeOut_Start();
-    //等待接收：转入接收不一定通讯接口忙，所以还必须或上是否可读。
-    while((RTU_PORT.modbusStatus.bBusy || !RTU_PORT.modbusStatus.bReadEnb) && !RTU_PORT.modbusStatus.bTimeOut);
-    //test
-    if(RTU_PORT.modbusStatus.bTimeOut)
+    static bool bWaitReceive = false;
+    if(!bWaitReceive)
     {
-        RTU_PORT.modbusStatus.unErrCount++;//通讯错误次数统计。
-        printf("F0x10接收超时!\n");
+        masterStatus.bDone = false;
+        //元件基址:1xxxx
+        u16 Addr = usDataAddr - 10000;
+
+        //发送数据打包为数据帧。
+        enCode_0x02(ucNodeAddr, Addr, usNum);
+        //发送
+        RTU_PORT.SendFrame();
+        //发送后转入接收。
+        RTU_PORT.ReceiveFrame();
+        //应答超时监测使能。
+        RTU_PORT.timeRespTimeOut_Start();
+        bWaitReceive = true;
     }
-
-    //接收后解析
-    //如果应答超时则不解析,处理下个事务（重发或进行下一帧发送）。
-    if(RTU_PORT.modbusStatus.bReadEnb && !RTU_PORT.modbusStatus.bTimeOut)
+    else
     {
-        //如果无错则对帧进行解码。
-        if(!RTU_PORT.modbusStatus.bErr)
+
+        //等待接收：转入接收不一定通讯接口忙，所以还必须或上是否可读。
+        while((!RTU_PORT.portStatus.bReadEnb) && !RTU_PORT.portStatus.bTimeOut);
+        //test
+        if(RTU_PORT.portStatus.bTimeOut)
         {
-            //如果返回数据不符。
-            if(!unCode_0x02(ucNodeAddr))
-            {
-                //test
-                printf("F0x02返回帧含出错信息或不是所需从站返回帧 \n\n\n\n");
-                Usart_SendFrame(USART1, User_DataBuffer.ucData, User_DataBuffer.usIndex);
-                printf("\n");
-            }
-            //返回正确，数据已经转储在指定存储区。
-            else{
-                //置位数据可读取标识。
-                RTU_PORT.modbusStatus.bDone = true;
-            }
+            RTU_PORT.portStatus.unErrCount++;//通讯错误次数统计。
+            printf("F0x10接收超时!\n");
+            bWaitReceive = true;
         }
-        //如果出错：CRC校验失败。
-        else
-            printf("F0x02返回帧CRC16校验失败！\n");
+
+        //接收后解析
+        //如果应答超时则不解析,处理下个事务（重发或进行下一帧发送）。
+        if(RTU_PORT.portStatus.bReadEnb && !RTU_PORT.portStatus.bTimeOut)
+        {
+            //如果无错则对帧进行解码。
+            if(!RTU_PORT.portStatus.bErr)
+            {
+                //如果返回数据不符。
+                if(!unCode_0x02(ucNodeAddr))
+                {
+                    //test
+                    printf("F0x02返回帧含出错信息或不是所需从站返回帧 \n\n\n\n");
+                    Usart_SendFrame(USART1, User_DataBuffer.ucData, User_DataBuffer.usIndex);
+                    printf("\n");
+                }
+                //返回正确，数据已经转储在指定存储区。
+                else{
+                    //置位数据可读取标识。
+                    masterStatus.bDone = true;
+                }
+            }
+            //如果出错：CRC校验失败。
+            else
+            {
+
+                printf("F0x02返回帧CRC16校验失败！\n");
+            }
+            bWaitReceive = true;
+        }
     }
 }
 
@@ -663,53 +729,64 @@ bool RTU_Master::unCode_0x02(u8 ucNodeAddr)
 //写多个连续的输出离散量DQ
 void RTU_Master::masterFunc_0x0F(u8 ucNodeAddr, u16 usDataAddr, u16 usNum)
 {
-    //元件基址
-    u16  Addr;
-    //元件基址 0xxxx
-    Addr = usDataAddr - 0;
-
-    //发送数据打包为数据帧。
-    enCode_0x0F(ucNodeAddr, Addr, usNum);
-    //发送
-    RTU_PORT.SendFrame();
-    //发送后转入接收。
-    RTU_PORT.ReceiveFrame();
-
-    //应答超时监测使能。
-    RTU_PORT.timeRespTimeOut_Start();
-    //等待接收：转入接收不一定通讯接口忙，所以还必须或上是否可读。
-    while((RTU_PORT.modbusStatus.bBusy || !RTU_PORT.modbusStatus.bReadEnb) && !RTU_PORT.modbusStatus.bTimeOut);
-    //test
-    if(RTU_PORT.modbusStatus.bTimeOut)
+    static bool bWaitReceive = false;
+    if(!bWaitReceive)
     {
-        RTU_PORT.modbusStatus.unErrCount++;//通讯错误次数统计。
-        printf("F0x10接收超时!\n");
+        masterStatus.bDone = false;
+        //元件基址 0xxxx
+        u16 Addr = usDataAddr - 0;
+
+        //发送数据打包为数据帧。
+        enCode_0x0F(ucNodeAddr, Addr, usNum);
+        //发送
+        RTU_PORT.SendFrame();
+        //发送后转入接收。
+        RTU_PORT.ReceiveFrame();
+
+        //应答超时监测使能。
+        RTU_PORT.timeRespTimeOut_Start();
+        bWaitReceive = true;
     }
-
-    //接收后解析
-    //如果应答超时则不解析,处理下个事务（重发或进行下一帧发送）。
-    if(RTU_PORT.modbusStatus.bReadEnb && !RTU_PORT.modbusStatus.bTimeOut)
+    else
     {
-        //如果无错则对帧进行解码。
-        if(!RTU_PORT.modbusStatus.bErr)
+        //等待接收：转入接收不一定通讯接口忙，所以还必须或上是否可读。
+        while((!RTU_PORT.portStatus.bReadEnb) && !RTU_PORT.portStatus.bTimeOut);
+        //test
+        if(RTU_PORT.portStatus.bTimeOut)
         {
-            //如果返回数据不符。
-            if(!unCode_0x0F(ucNodeAddr))
-            {
-                //test
-                printf("F0x0F返回帧含出错信息或不是所需从站返回帧 \n\n\n\n");
-                Usart_SendFrame(USART1, User_DataBuffer.ucData, User_DataBuffer.usIndex);
-                printf("\n");
-            }
-            //返回正确。
-            else{
-                //置位完成。写操作不需要转储返回的其他数据。
-                RTU_PORT.modbusStatus.bDone = true;
-            }
+            RTU_PORT.portStatus.unErrCount++;//通讯错误次数统计。
+            printf("F0x10接收超时!\n");
+            bWaitReceive = true;
         }
-        //如果出错：CRC校验失败。
-        else
-            printf("F0x0F返回帧CRC16校验失败！\n");
+        //接收后解析
+        //如果应答超时则不解析,处理下个事务（重发或进行下一帧发送）。
+        if(RTU_PORT.portStatus.bReadEnb && !RTU_PORT.portStatus.bTimeOut)
+        {
+            //如果无错则对帧进行解码。
+            if(!RTU_PORT.portStatus.bErr)
+            {
+                //如果返回数据不符。
+                if(!unCode_0x0F(ucNodeAddr))
+                {
+                    //test
+                    printf("F0x0F返回帧含出错信息或不是所需从站返回帧 \n\n\n\n");
+                    Usart_SendFrame(USART1, User_DataBuffer.ucData, User_DataBuffer.usIndex);
+                    printf("\n");
+                }
+                //返回正确。
+                else{
+                    //置位完成。写操作不需要转储返回的其他数据。
+                    masterStatus.bDone = true;
+                }
+            }
+            //如果出错：CRC校验失败。
+            else
+            {
+
+                printf("F0x0F返回帧CRC16校验失败！\n");
+            }
+            bWaitReceive = true;
+        }
     }
 }
 
@@ -780,49 +857,62 @@ bool RTU_Master::unCode_0x0F(u8 ucNodeAddr)
 //读取多个连续输出离散量DQ
 void RTU_Master::masterFunc_0x01(u8 ucNodeAddr, u16 usDataAddr, u16 usNum)
 {
-    //元件基址:0xxxx
-    u16 Addr = usDataAddr - 00000;
+    static bool bWaitReceive = false;
+    if(!bWaitReceive)
+    {
+        masterStatus.bDone = false;
+        //元件基址:0xxxx
+        u16 Addr = usDataAddr - 00000;
 
-    //发送数据打包为数据帧。
-    enCode_0x01(ucNodeAddr, Addr, usNum);
-    //发送
-    RTU_PORT.SendFrame();
-    //发送后转入接收。
-    RTU_PORT.ReceiveFrame();
-    //应答超时监测使能。
-    RTU_PORT.timeRespTimeOut_Start();
-    //等待接收：转入接收不一定通讯接口忙，所以还必须或上是否可读。
-    while((RTU_PORT.modbusStatus.bBusy || !RTU_PORT.modbusStatus.bReadEnb) && !RTU_PORT.modbusStatus.bTimeOut);
-    //test
-    if(RTU_PORT.modbusStatus.bTimeOut)
-    {
-        RTU_PORT.modbusStatus.unErrCount++;//通讯错误次数统计。
-        printf("F0x10接收超时!\n");
+        //发送数据打包为数据帧。
+        enCode_0x01(ucNodeAddr, Addr, usNum);
+        //发送
+        RTU_PORT.SendFrame();
+        //发送后转入接收。
+        RTU_PORT.ReceiveFrame();
+        //应答超时监测使能。
+        RTU_PORT.timeRespTimeOut_Start();
+        bWaitReceive = true;
     }
-    //接收后解析
-    //如果应答超时则不解析,处理下个事务（重发或进行下一帧发送）。
-    if(RTU_PORT.modbusStatus.bReadEnb && !RTU_PORT.modbusStatus.bTimeOut)
+    else
     {
-        //如果无错则对帧进行解码。
-        if(!RTU_PORT.modbusStatus.bErr)
+        //等待接收：转入接收不一定通讯接口忙，所以还必须或上是否可读。
+        while((!RTU_PORT.portStatus.bReadEnb) && !RTU_PORT.portStatus.bTimeOut);
+        //test
+        if(RTU_PORT.portStatus.bTimeOut)
         {
-            //如果返回数据不符。
-            if(!unCode_0x01(ucNodeAddr))
-            {
-                //test
-                printf("F0x01返回帧含出错信息或不是所需从站返回帧 \n\n\n\n");
-                Usart_SendFrame(USART1, User_DataBuffer.ucData, User_DataBuffer.usIndex);
-                printf("\n");
-            }
-            //返回正确，数据已经转储在指定存储区。
-            else{
-                //置位数据可读取标识。
-                RTU_PORT.modbusStatus.bDone = true;
-            }
+            RTU_PORT.portStatus.unErrCount++;//通讯错误次数统计。
+            printf("F0x10接收超时!\n");
+            bWaitReceive = true;
         }
-        //如果出错：CRC校验失败。
-        else
-            printf("F0x01返回帧CRC16校验失败！\n");
+        //接收后解析
+        //如果应答超时则不解析,处理下个事务（重发或进行下一帧发送）。
+        if(RTU_PORT.portStatus.bReadEnb && !RTU_PORT.portStatus.bTimeOut)
+        {
+            //如果无错则对帧进行解码。
+            if(!RTU_PORT.portStatus.bErr)
+            {
+                //如果返回数据不符。
+                if(!unCode_0x01(ucNodeAddr))
+                {
+                    //test
+                    printf("F0x01返回帧含出错信息或不是所需从站返回帧 \n\n\n\n");
+                    Usart_SendFrame(USART1, User_DataBuffer.ucData, User_DataBuffer.usIndex);
+                    printf("\n");
+                }
+                //返回正确，数据已经转储在指定存储区。
+                else{
+                    //置位数据可读取标识。
+                    masterStatus.bDone = true;
+                }
+            }
+            //如果出错：CRC校验失败。
+            else
+            {
+                printf("F0x01返回帧CRC16校验失败！\n");
+            }
+            bWaitReceive = true;
+        }
     }
 }
 

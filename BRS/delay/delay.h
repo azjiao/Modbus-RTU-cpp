@@ -21,10 +21,10 @@
 #define RELOAD_500US    SystemCoreClock/2000U
 
 // 延时器,配合SysTick使用。
-static struct {
+typedef struct {
     u32 uTimer_ms;  // ms延时器,用于查询延时。
     bool bPlus_ms;  // ms脉冲信号,0.5msON,0.5msOFF.
-}Timer;
+}SysTick_TimerType;
 
 // 脉冲型定时器结构
 typedef struct {
