@@ -19,7 +19,7 @@ const bool bWrite = true;
 typedef  struct
 {
     bool bDone;       //主站一次通讯完成，数据可读取。1:回传的数据可以读取。
-    bool bBusy;       //忙。对于接收，接收开始不一定忙。
+   // bool bBusy;       //忙。对于接收，接收开始不一定忙。映射来自端口的bBusy信号。
     bool bErr;        //接收帧有错误.
     bool bTimeOut;    //应答超时。 可归并到usErr中.这是当bErr为true且usErrMsg=4的等价bool量。
     u16  usErrMsg;    //通讯错误信息.0:无错;1:非本站信息(主站不用错误1);2:帧CRC错误;3:字节接收出错,4:接收超时。
@@ -73,9 +73,8 @@ class RTU_Master
         bool unCode_0x0F(u8 ucNodeAddr);
         bool enCode_0x10(u8 ucNodeAddr, u16 usDataAddr, u16 usNum);
         bool unCode_0x10(u8 ucNodeAddr);
-
-
-
+        //判断接收帧是否有错。
+        void judge(char* ptrFunCode, bool bUnCode);
     public:
         RTU_Master(RTU_DataCtrl* ptr = &RTU_PORT_ALIAS);
         ~RTU_Master(void){pRTUPort = nullptr; };

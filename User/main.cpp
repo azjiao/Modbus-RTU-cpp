@@ -62,8 +62,6 @@ int main(void)
     }
 
     printf("\r\n");
-
-
     int iErr = Neo_RTUPort.portStatus.unErrCount;
     printf("count of commit is:%d\r\n", iCount);
     printf("count of err is:%d\r\n", iErr);
@@ -75,50 +73,64 @@ int main(void)
     iStep = 1;
 
     bool bTComm_Act = true;
+    bool bMode;
+    u8 ucNodeAddr;
+    u32 unDataAddr;
+    u16 usDataNum;
+
     while(1)
-    {
-        TimeON(bTComm_Act, 10U, &timer_RTU_Comm);
+    {                
+        TimeON(bTComm_Act, 500U, &timer_RTU_Comm);     
+        
         if(!bTComm_Act)
             bTComm_Act = true;
-
-        if(timer_RTU_Comm.bQ)
-        {
-            //for(int i = 0; i < 500000; i++);
-
+              
+        if(timer_RTU_Comm.bQ)  
+        {          
             //write HoldReg F0x03
             if(iStep == 1)
             {
-                //printf("in Step 1\r\n");
-                myProtocol2.master(4, bRead, 40000, 10);
-                if(myProtocol2.masterStatus.bDone)
-                {
-                    iStep = 2;
-                }
+                ucNodeAddr = 4;
+                bMode = bRead;
+                unDataAddr = 40000;
+                usDataNum = 10;
+                myProtocol2.master(ucNodeAddr, bMode, unDataAddr, usDataNum);
+                if(RTU_PORT_ALIAS.portStatus.bErr)
+                    printf("Err!--> iCount = %d,iStep = %d.\tbErr=%d,usErr=%d\r\n", iCount, iStep, RTU_PORT_ALIAS.portStatus.bErr, RTU_PORT_ALIAS.portStatus.usErr);
+                //如果通讯完成或通讯出错都转入下一步。
+                if(myProtocol2.masterStatus.bDone || RTU_PORT_ALIAS.portStatus.bErr)
+                    iStep = 2;                
             }
             if(iStep == 2)
-            {
-                //printf("in Step 2\r\n");
-                //printf("从从站读出的原始数据是：\r\n");
-                // myProtocol2.printBuff(); //经过读取，slave以大端模式存放和发送。
-                // 以32位整数方式读取,正常是以大端模式读取。
-                myProtocol2.read32bitData_BMode((u32*)usDataTemp, 5);//测试结果：slave采用的是大端模式，也就是按照协议要求显示。
-
-                //            for(int i = 0; i < 10; i++)
-                //            {
-                //                usTemp = *(usDataTemp + i);
-                //                printf("大端模式读取的数据为：%f\r\n", usTemp);
-                //            }
-
-                myProtocol2.master(4, bWrite, 40020, 20);
-                if(myProtocol2.masterStatus.bDone)
+            {                       
+                myProtocol2.read32bitData_BMode((u32*)usDataTemp, 5);//测试结果：slave采用的是大端模式，也就是按照协议要求显示。                
+                
+                for(int i = 0; i < 5; i++)
                 {
-                    iStep = 1;
-                    //printf("-----------------------------\r\n");
+                    printf("%f\t", *(((float*)&usDataTemp) + i));
                 }
-            }
-
-            if(++iCount % 200 == 0)
-                printf("iCount = %d\r\n", iCount);
+                printf("\r\n");
+                
+                ucNodeAddr = 4;
+                bMode = bWrite;
+                unDataAddr = 40020;
+                usDataNum = 10;
+                myProtocol2.master(ucNodeAddr, bMode, unDataAddr, usDataNum);
+                if(RTU_PORT_ALIAS.portStatus.bErr)
+                    printf("Err!--> iCount = %d,iStep = %d.\tbErr=%d,usErr=%d\r\n", iCount, iStep, RTU_PORT_ALIAS.portStatus.bErr, RTU_PORT_ALIAS.portStatus.usErr);
+                if(myProtocol2.masterStatus.bDone || RTU_PORT_ALIAS.portStatus.bErr)
+                    iStep = 3;
+             }                
+            
+            if(iStep == 3)
+            {
+                iStep = 1;
+                //printf("-----------------------------\r\n");
+            }           
+           
+           ++iCount;
+            if(iCount % 20 == 0)
+                printf("iCount = %d,iStep = %d.\tbErr=%d,usErr=%d\r\n", iCount, iStep, RTU_PORT_ALIAS.portStatus.bErr, RTU_PORT_ALIAS.portStatus.usErr);
 
             bTComm_Act = false;
         }

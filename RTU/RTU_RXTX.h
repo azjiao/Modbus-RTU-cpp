@@ -82,8 +82,8 @@ class Port_RTU : Port_RS485
         void timeRespTimeOut_Start(void){Trespond.timer_ResetONOFF(bTimerStart);};
         void timeFrameEnd_Start(void) {T15_35.timer_ResetONOFF(bTimerStart);};
         void timeFrameEnd_Stop(void) {T15_35.timer_ResetONOFF(bTimerStop);}
-        void RS485_TX(void) {PDout(7) = 1;}  //使PD7为1使能发送。
-        void RS485_RX(void) {PDout(7) = 0;}  //使PD7为0使能接收。
+        void RS485_TX(void) {PDout(7) = 1; }  //使PD7为1使能发送。
+        void RS485_RX(void) {PDout(7) = 0; }  //使PD7为0使能接收。
         //设置Modbus-RTU所用端口的通讯参数。
         void setRTU_PortParam(u32 unBR, u16 usDB, u16 usSB, u16 usPt)
         {
@@ -121,6 +121,7 @@ class RTU_DataCtrl : public Port_RTU
         //复位状态字准备发送数据帧
         void resetStatus4TX(void)
         {
+            portStatus.bReadEnb = false;  //复位数据可读取标识。
             portStatus.bErr = false;
             portStatus.bTimeOut = false;
             portStatus.bMode = bTXMode;  //处于发送状态.

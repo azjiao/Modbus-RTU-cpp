@@ -1,6 +1,6 @@
 //中断服务函数必须以extern "C"{  }包围,防止编译器改变函数名为C++格式的长函数名.
 #include "dev.h"
-
+#include <stdio.h>
 #ifdef __cplusplus
     extern "C" {
 #endif
@@ -13,10 +13,15 @@ extern SysTick_TimerType Timer;
 //所产生的脉冲周期为2ms，每1ms翻转一次。
 void SysTick_Handler(void)
 {
+    static int iCount = 0;
     Timer.bPlus_ms = !Timer.bPlus_ms;
     //Timer.uTimer_ms用于等待延时，如果不采用等待方式延时则该参数无用。
     if(Timer.uTimer_ms != 0U)
         Timer.uTimer_ms--;
+        
+    if(++iCount % 20000 == 0)
+        printf("%d\t\r\n", iCount);
+        
 }
 
 #ifdef __cplusplus

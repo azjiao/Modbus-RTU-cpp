@@ -6,14 +6,14 @@
 #ifdef __cplusplus
     extern "C" {
 #endif
-
+#include <stdio.h>
 //串口2接收中断服务函数
 //当串口接收到一个字节时发生该中断.
 void USART2_IRQHandler(void)
 {
     u8 ucData;
     if(USART_GetITStatus(USART2, USART_IT_RXNE) == SET)
-    {
+    {        
         LED1_ON;
         //复位应答超时定时器并停止工作。
         RTU_PORT_ALIAS.timeRespTimeOut_Stop();
@@ -31,26 +31,20 @@ void USART2_IRQHandler(void)
            RTU_PORT_ALIAS.portStatus.bErr = true;
         }
         else
-        {
-            RTU_PORT_ALIAS.portStatus.usErr = 0;
+        {            
             RTU_PORT_ALIAS.portStatus.bErr = false;
         }
 
         //如果字节接收无错且接收缓冲区没有越限则接收转储数据,并重新启动t3.5定时器.
         //否则，则不储存数据到接收缓冲区，将导致CRC校验错误，也会让最终结果错误。
-//        if((Modbus_Status_Struct.u16CommErr == 0) && (RXBuffer.u16Index < FRAME_MAXLEN -1))
-       if(RTU_PORT_ALIAS.portStatus.usErr == 0)
+       if(!RTU_PORT_ALIAS.portStatus.bErr)
         {
             //转储接收到的字节数据.
-//            RXBuffer.Buffer[RXBuffer.u16Index] = u8Data;
-//            RXBuffer.u16Index++;
             RTU_PORT_ALIAS.saveAData(ucData);
-
             //复位并重新启动t3.5定时器,监测数据帧是否结束.
             RTU_PORT_ALIAS.timeFrameEnd_Start();
         }
     }
-    //LED1_OFF;
 }
 
 //t3.5定时器中断服务函数。
@@ -62,6 +56,9 @@ void TIM6_IRQHandler(void)
 {
     if(TIM_GetITStatus(TIM6, TIM_IT_Update) == SET)
     {
+        //如果帧可读，等待处理帧时不再接收数据，把模式改为发送,以免接收到的数据被添加到帧末造成问题。
+        RTU_PORT_ALIAS.RS485_TX();  //发送使能
+        
         //复位应答超时定时器并停止工作。
         RTU_PORT_ALIAS.timeRespTimeOut_Stop();
         RTU_PORT_ALIAS.portStatus.bTimeOut = false;
@@ -71,16 +68,13 @@ void TIM6_IRQHandler(void)
         //当处于接收时校验CRC16.
         if(RTU_PORT_ALIAS.portStatus.bMode == bRXMode)
         {
+            printf("接收结束\r\n");
             //判断数据帧的有效性.
             //只对通讯数据帧本身作判断，也即CRC校验。
             if(RTU_PORT_ALIAS.CRC16Check())
             {
-                RTU_PORT_ALIAS.portStatus.bErr = false;   //数据帧可读时bErr为false，所以可以取消对bErr的判断。
-                //设置系统状态进入空闲.
-                RTU_PORT_ALIAS.portStatus.bBusy = false;
-                RTU_PORT_ALIAS.portStatus.bReadEnb = true;  //帧可读取。
-                //如果帧可读，等待处理帧时不再接收数据，把模式改为发送,以免接收到的数据被添加到帧末造成问题。
-                RTU_PORT_ALIAS.RS485_TX();  //发送使能
+                RTU_PORT_ALIAS.portStatus.bErr = false;   //数据帧可读时bErr为false，所以可以取消对bErr的判断。               
+                RTU_PORT_ALIAS.portStatus.bReadEnb = true;  //帧可读取。                
             }
             //如果CRC失败，则丢弃本帧，重新接收。
             else
@@ -88,9 +82,12 @@ void TIM6_IRQHandler(void)
                 RTU_PORT_ALIAS.portStatus.unErrCount++;//通讯错误次数统计。
                 RTU_PORT_ALIAS.portStatus.bErr = true;
                 RTU_PORT_ALIAS.portStatus.usErr = 2; //CRC校验失败。
+                RTU_PORT_ALIAS.portStatus.bReadEnb = false;  //帧不可读。
                 //丢弃本次数据帧，并重新启动接收。
-                RTU_PORT_ALIAS.ReceiveFrame();
+                //RTU_PORT_ALIAS.ReceiveFrame();
             }
+            //设置系统状态进入空闲.
+            RTU_PORT_ALIAS.portStatus.bBusy = false;
             LED1_OFF;
         }
         //如果处于发送则不作校验。
@@ -98,6 +95,7 @@ void TIM6_IRQHandler(void)
         {
             //设置系统状态进入空闲.
             RTU_PORT_ALIAS.portStatus.bBusy = false;
+            printf("发送结束\r\n");
         }
     }
 }
@@ -109,6 +107,7 @@ void TIM7_IRQHandler(void)
 {
     if(TIM_GetITStatus(TIM7, TIM_IT_Update) == SET)
     {
+        printf("in TIM7,超时!\r\n");
         RTU_PORT_ALIAS.portStatus.bErr = true;
         RTU_PORT_ALIAS.portStatus.usErr = 4;
         RTU_PORT_ALIAS.portStatus.bTimeOut = true;
