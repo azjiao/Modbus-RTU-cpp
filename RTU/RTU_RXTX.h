@@ -17,6 +17,8 @@ const bool bTXMode = false;  //发送模式
 const bool bRXMode = true;   //接收模式
 const bool bMaster = true;
 const bool bSlave = false;
+const u8 ucFrameEndTimerRun = 1; //帧结束监测器工作
+const u8 ucTimeOutTimerRun = 2;  //超时监测器工作
 
 #include "RTU_Config.h"
 //------------------------------------------------------
@@ -73,15 +75,37 @@ class Port_RTU : Port_RS485
 
         static BaseTimer T15_35;    //t1.5和t3.5共用定时器.
         static BaseTimer Trespond;  //超时定时器.
-
+        
+        u8 ucWhichTimer;            //目前是哪个定时器工作：ucFrameEndTimerRun帧结束监测器还是ucTimeOutTimerRun超时监测器？
+        
     public:
         Port_RTU(u32 unBR, u16 usDB, u16 usSB, u16 usPt);
         ~Port_RTU(){};
-
-        void timeRespTimeOut_Stop(void){Trespond.timer_ResetONOFF(bTimerStop);};
-        void timeRespTimeOut_Start(void){Trespond.timer_ResetONOFF(bTimerStart);};
-        void timeFrameEnd_Start(void) {T15_35.timer_ResetONOFF(bTimerStart);};
-        void timeFrameEnd_Stop(void) {T15_35.timer_ResetONOFF(bTimerStop);}
+        
+        //查询哪个定时器工作？
+        u8 whichTimerRun() {return ucWhichTimer;};          
+        //void timeRespTimeOut_Start(void){Trespond.timer_Init(bTimerStart); Trespond.timer_ResetONOFF(bTimerStart); ucWhichTimer = ucTimeOutTimerRun;};
+        void timeRespTimeOut_Start(void)
+        {            
+            Trespond.timer_Init(bTimerStop); 
+            Trespond.timer_ResetONOFF(bTimerStart);
+            ucWhichTimer = ucTimeOutTimerRun;
+        }
+        void timeRespTimeOut_Stop(void)
+        {
+            Trespond.timer_ResetONOFF(bTimerStop);
+        }
+        //void timeFrameEnd_Start(void) {T15_35.timer_Init(bTimerStart); T15_35.timer_ResetONOFF(bTimerStart);ucWhichTimer = ucFrameEndTimerRun;};
+        void timeFrameEnd_Start(void) 
+        {
+            T15_35.timer_Init(bTimerStop);
+            T15_35.timer_ResetONOFF(bTimerStart);
+            ucWhichTimer = ucFrameEndTimerRun;
+        }
+        void timeFrameEnd_Stop(void)
+        {
+            T15_35.timer_ResetONOFF(bTimerStop);
+        }
         void RS485_TX(void) {PDout(7) = 1; }  //使PD7为1使能发送。
         void RS485_RX(void) {PDout(7) = 0; }  //使PD7为0使能接收。
         //设置Modbus-RTU所用端口的通讯参数。

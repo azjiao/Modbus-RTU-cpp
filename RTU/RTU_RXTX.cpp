@@ -132,7 +132,7 @@ Port_RTU::Port_RTU(u32 unBR, u16 usDB, u16 usSB, u16 usPt) : \
     usT15_us = 1.5 * fOneByteTime;  //t1.5定时时间us.
     usT35_us = 3.5 * fOneByteTime;  //t3.5定时时间us.
     usTresponse_ms = usTimeOut;  //超时定时值(500)ms.
-    T15_35.setProperty(ucT15_35No, usT35_us, bUnitus);    //以t3.5工作，取消了字节流监测。
+    T15_35.setProperty(ucT15_35No, usT35_us, bUnitus);    //以t3.5工作，取消了字节流监测。    
     Trespond.setProperty(ucTrespNo, usTresponse_ms, bUnitms);
 }
 
@@ -150,12 +150,16 @@ void Port_RTU::portRTU_Init(void)
     //设置T15_35,本设计不监测字节流，只监测帧结束和应答超时。所以T15_35定时器以t3.5方式工作,(第四参数缺省)暂不启动定时器.
  //   T15_35.Timer_Init(ucT15_35No, usT35_us, bUnitus);
     //FixME:由于已经在构造函数中初始化过定时器属性，可以使用如下初始化定时器。(简化初始化，只在一处进行属性设置，避免无谓的错误。)
-    T15_35.timer_Init(bTimerStop);
+    //由于共用定时器，下次需要使用时必须首先初始化。
+ //   T15_35.timer_Init(bTimerStop);
     //设置Trespond,(第四参数缺省)暂不启动定时器.
  //   Trespond.Timer_Init(ucTrespNo, usTresponse_ms, bUnitms);
     //FixME:由于已经在构造函数中初始化过定时器属性，可以使用如下初始化定时器。
-    Trespond.timer_Init(bTimerStop);
-
+    //采用TIM6作为帧结束监测和应答超时定时器，首先使用的是t3.5，所以暂不对应答超时进行初始化。
+    //当需要使用超时定时器时先进行初始化。
+    //Trespond.timer_Init(bTimerStop);
+    
+    
     //默认为接收模式
     RS485_RX();
 }
@@ -250,7 +254,7 @@ void RTU_DataCtrl::SendFrame(void)
     while(USART_GetFlagStatus(USART2, USART_FLAG_TC) != SET);
     //帧间延时，开启t3.5。
     //延时结束会使bBusy复位。
-    //T15_35.timer_ResetONOFF(bTimerStart);
+    //T15_35.timer_ResetONOFF(bTimerStart);    
     timeFrameEnd_Start();
     //等待帧间隔结束。
     while(portStatus.bBusy);

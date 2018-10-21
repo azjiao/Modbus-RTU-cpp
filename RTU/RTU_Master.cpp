@@ -226,11 +226,12 @@ void RTU_Master::masterFunc_0x10(u8 ucNodeAddr, u16 usDataAddr, u16 usNum)
     enCode_0x10(ucNodeAddr, Addr, usNum);
     //发送
     RTU_PORT.SendFrame();
+       
     //发送后转入接收。
     RTU_PORT.ReceiveFrame();
-
     //应答超时监测使能。
     RTU_PORT.timeRespTimeOut_Start();
+ 
 
     while((!RTU_PORT.portStatus.bReadEnb) && !RTU_PORT.portStatus.bErr);
 
@@ -322,10 +323,12 @@ void RTU_Master::masterFunc_0x03(u8 ucNodeAddr, u16 usDataAddr, u16 usNum)
     enCode_0x03(ucNodeAddr, Addr, usNum);
     //发送
     RTU_PORT.SendFrame();
+        
     //发送后转入接收。
     RTU_PORT.ReceiveFrame();
     //应答超时监测使能。
     RTU_PORT.timeRespTimeOut_Start();
+
     //等待接收：转入接收不一定通讯接口忙，所以还必须或上是否可读。
     while((!RTU_PORT.portStatus.bReadEnb) && !RTU_PORT.portStatus.bErr);
 

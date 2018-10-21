@@ -65,38 +65,52 @@ void TIM6_IRQHandler(void)
         //复位t3.5定时器并失能,停止定时监测.
         RTU_PORT_ALIAS.timeFrameEnd_Stop();
 
-        //当处于接收时校验CRC16.
-        if(RTU_PORT_ALIAS.portStatus.bMode == bRXMode)
-        {
-            printf("接收结束\r\n");
-            //判断数据帧的有效性.
-            //只对通讯数据帧本身作判断，也即CRC校验。
-            if(RTU_PORT_ALIAS.CRC16Check())
+        // 当帧结束监测器工作时：
+        //if(RTU_PORT_ALIAS.whichTimerRun() == ucFrameEndTimerRun)
+        //{
+            //当处于接收时校验CRC16.
+            if(RTU_PORT_ALIAS.portStatus.bMode == bRXMode)
             {
-                RTU_PORT_ALIAS.portStatus.bErr = false;   //数据帧可读时bErr为false，所以可以取消对bErr的判断。               
-                RTU_PORT_ALIAS.portStatus.bReadEnb = true;  //帧可读取。                
+                printf("接收结束\r\n");
+                //判断数据帧的有效性.
+                //只对通讯数据帧本身作判断，也即CRC校验。
+                if(RTU_PORT_ALIAS.CRC16Check())
+                {
+                    RTU_PORT_ALIAS.portStatus.bErr = false;   //数据帧可读时bErr为false，所以可以取消对bErr的判断。               
+                    RTU_PORT_ALIAS.portStatus.bReadEnb = true;  //帧可读取。                
+                }
+                //如果CRC失败，则丢弃本帧，重新接收。
+                else
+                {
+                    RTU_PORT_ALIAS.portStatus.unErrCount++;//通讯错误次数统计。
+                    RTU_PORT_ALIAS.portStatus.bErr = true;
+                    RTU_PORT_ALIAS.portStatus.usErr = 2; //CRC校验失败。
+                    RTU_PORT_ALIAS.portStatus.bReadEnb = false;  //帧不可读。
+                    //丢弃本次数据帧，并重新启动接收。
+                    //RTU_PORT_ALIAS.ReceiveFrame();
+                }
+                //设置系统状态进入空闲.
+                RTU_PORT_ALIAS.portStatus.bBusy = false;
+                LED1_OFF;
             }
-            //如果CRC失败，则丢弃本帧，重新接收。
+            //如果处于发送则不作校验。
             else
             {
-                RTU_PORT_ALIAS.portStatus.unErrCount++;//通讯错误次数统计。
-                RTU_PORT_ALIAS.portStatus.bErr = true;
-                RTU_PORT_ALIAS.portStatus.usErr = 2; //CRC校验失败。
-                RTU_PORT_ALIAS.portStatus.bReadEnb = false;  //帧不可读。
-                //丢弃本次数据帧，并重新启动接收。
-                //RTU_PORT_ALIAS.ReceiveFrame();
+                //设置系统状态进入空闲.
+                RTU_PORT_ALIAS.portStatus.bBusy = false;
+                printf("发送结束\r\n");
             }
-            //设置系统状态进入空闲.
-            RTU_PORT_ALIAS.portStatus.bBusy = false;
-            LED1_OFF;
-        }
-        //如果处于发送则不作校验。
-        else
-        {
-            //设置系统状态进入空闲.
-            RTU_PORT_ALIAS.portStatus.bBusy = false;
-            printf("发送结束\r\n");
-        }
+       // }
+        //当超时监测器工作时：
+       // else if(RTU_PORT_ALIAS.whichTimerRun() == ucTimeOutTimerRun)
+      //  {
+//            printf("in TIM6,超时!\r\n");
+//            RTU_PORT_ALIAS.portStatus.bErr = true;
+//            RTU_PORT_ALIAS.portStatus.usErr = 4;
+//            RTU_PORT_ALIAS.portStatus.bTimeOut = true;
+//            //复位应答超时定时其并停止工作。
+//            RTU_PORT_ALIAS.timeRespTimeOut_Stop();
+      //  }
     }
 }
 
@@ -107,7 +121,7 @@ void TIM7_IRQHandler(void)
 {
     if(TIM_GetITStatus(TIM7, TIM_IT_Update) == SET)
     {
-        printf("in TIM7,超时!\r\n");
+        printf("in TIM7,超时!,当前值%d\r\n",TIM_GetCounter(TIM7));
         RTU_PORT_ALIAS.portStatus.bErr = true;
         RTU_PORT_ALIAS.portStatus.usErr = 4;
         RTU_PORT_ALIAS.portStatus.bTimeOut = true;

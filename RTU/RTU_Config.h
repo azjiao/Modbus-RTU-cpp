@@ -18,7 +18,7 @@ const u32 BAUDRATE = 9600;  //波特率
 const u16 DATABIT = 8;  //数据位长度
 const u16 STOPBIT = 1;  //停止位
 const u16 PARITY = 0;  //奇偶校验：0无校验，1奇校验，2偶校验
-const u16 usTimeOut = 1000;  //从站应答超时时间,单位ms.
+const u16 usTimeOut = 500;  //从站应答超时时间,单位ms.
 
 //定义中断服务中使用的RTU_DataCtrl实例的别名:如果RTU_DataCtrl的实例名改变，请一并改变这里的Neo_RTUPort为所需。
 class RTU_DataCtrl;

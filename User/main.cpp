@@ -77,7 +77,22 @@ int main(void)
     u8 ucNodeAddr;
     u32 unDataAddr;
     u16 usDataNum;
-
+    int  unFlag = 0;
+//    while(1)
+//        if(unFlag == 0)
+//        {
+//            printf("in 1\r\n");
+//            RTU_PORT_ALIAS.timeRespTimeOut_Stop(); 
+//                printf("1\r\n");
+//             unFlag++;
+//        }
+//        else if(unFlag++ == 1)
+//        {
+//            printf("in 2\r\n");
+//            RTU_PORT_ALIAS.timeRespTimeOut_Start();  
+//            printf("2\r\n");
+//        }
+    
     while(1)
     {                
         TimeON(bTComm_Act, 500U, &timer_RTU_Comm);     
@@ -85,7 +100,8 @@ int main(void)
         if(!bTComm_Act)
             bTComm_Act = true;
               
-        if(timer_RTU_Comm.bQ)  
+        if(timer_RTU_Comm.bQ) 
+        //if(key0_Scan(false))
         {          
             //write HoldReg F0x03
             if(iStep == 1)
@@ -129,7 +145,7 @@ int main(void)
             }           
            
            ++iCount;
-            if(iCount % 20 == 0)
+            //if(iCount % 20 == 0)
                 printf("iCount = %d,iStep = %d.\tbErr=%d,usErr=%d\r\n", iCount, iStep, RTU_PORT_ALIAS.portStatus.bErr, RTU_PORT_ALIAS.portStatus.usErr);
 
             bTComm_Act = false;
