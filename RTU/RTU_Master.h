@@ -13,13 +13,13 @@
 //用户数据缓冲区最大长度字节数。
 const u16 usUser_BufMaxLen = (u16)256;
 
-const bool bRead = false;
+const bool bRead  = false;
 const bool bWrite = true;
 
+//由于采用主站执行就必须由cpu执行完毕(要么正常执行完毕要么出现故障执行完毕)的设计，并无buzy的检测可能，所以取消了buzy信号状态。
 typedef  struct
 {
     bool bDone;       //主站一次通讯完成，数据可读取。1:回传的数据可以读取。
-   // bool bBusy;       //忙。对于接收，接收开始不一定忙。映射来自端口的bBusy信号。
     bool bErr;        //接收帧有错误.
     bool bTimeOut;    //应答超时。 可归并到usErr中.这是当bErr为true且usErrMsg=4的等价bool量。
     u16  usErrMsg;    //通讯错误信息.0:无错;1:非本站信息(主站不用错误1);2:帧CRC错误;3:字节接收出错,4:接收超时。
@@ -41,7 +41,7 @@ class RTU_Master
         //主站使用的RTU_DataCtrl 实例的指针
         RTU_DataCtrl* pRTUPort;
         //定义主站使用的RTU_DataCtrl 实例的别名
-        #define RTU_PORT  (*(pRTUPort))
+#define RTU_PORT  (*(pRTUPort))
 
         //主站支持的RTU协议功能码。
         enum
@@ -80,7 +80,7 @@ class RTU_Master
         ~RTU_Master(void){pRTUPort = nullptr; };
 
         ModbusStatus_Struct masterStatus;  //主站状态字。
-         //主站初始化: 配置硬件并接收数据开始工作。
+        //主站初始化: 配置硬件并接收数据开始工作。
         void master_Init(u32 unBR = BAUDRATE, u16 usDB = DATABIT, u16 usSB = STOPBIT, u16 usPt = PARITY)
         {
             RTU_PORT.RTU_Init(unBR, usDB ,usSB, usPt);

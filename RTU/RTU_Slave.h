@@ -41,7 +41,7 @@ class RTU_Slave
         Source_Type Source;  //从站提供通讯的资源.
         RTU_DataCtrl* pRTUPort;  //从站使用的RTU_DataCtrl实例的指针。
         //定义从站使用的RTU_DataCtrl 实例的别名。
-        #define RTU_PORT  (*(pRTUPort))
+#define RTU_PORT  (*(pRTUPort))
         //从站支持的RTU协议功能码.
         enum
         {

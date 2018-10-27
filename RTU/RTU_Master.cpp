@@ -5,13 +5,13 @@
 //RTU_Master 构造函数。
 RTU_Master::RTU_Master(RTU_DataCtrl* ptr)
 {
-    //masterStatus.bBusy = false;  //noused
-    masterStatus.bDone = false;
-    masterStatus.bErr = false;
-    masterStatus.bTimeOut = false;
-    masterStatus.usErrMsg = 0;
+    //masterStatus.bBusy    = false;  //noused
+    masterStatus.bDone      = false;
+    masterStatus.bErr       = false;
+    masterStatus.bTimeOut   = false;
+    masterStatus.usErrMsg   = 0;
     masterStatus.unErrCount = 0;
-    pRTUPort = ptr;
+    pRTUPort                = ptr;
 }
 
 //向数据缓冲区写数据
@@ -46,7 +46,7 @@ void RTU_Master::write16bitData_LMode(u16* ptrSource, u16 usNum)
     int i = 0;
     for(i = 0; (i < usNum) && (i < (usUser_BufMaxLen >> 1)); i++)
     {
-        User_DataBuffer.ucData[2*i] = (*(ptrSource + i) & 0xFF00) >> 8;  //低地址存放高字节, 源数据的高字节在高地址.
+        User_DataBuffer.ucData[2*i]     = (*(ptrSource + i) & 0xFF00) >> 8;  //低地址存放高字节, 源数据的高字节在高地址.
         User_DataBuffer.ucData[2*i + 1] = (*(ptrSource + i)) & 0xFF;  //高地址存放低字节
         //other.
         //*((u16*)User_DataBuffer.ucData + i) = ((*(ptrSource + i)) & 0xFF << 8) | ((*(ptrSource + i) & 0xFF00) >> 8);
@@ -63,7 +63,7 @@ void RTU_Master::write16bitData_BMode(u16* ptrSource, u16 usNum)
     for(int i = 0; (i < usNum) && (i < (usUser_BufMaxLen >> 1)); i++)
     {
         //为了避免函数调用的开销，这里不调用write2Buffer()函数。
-        User_DataBuffer.ucData[2*i] = *(ptrSource + i) & 0xFF;  //低地址存放高字节,源数据高字节在低地址。
+        User_DataBuffer.ucData[2*i]     = *(ptrSource + i) & 0xFF;  //低地址存放高字节,源数据高字节在低地址。
         User_DataBuffer.ucData[2*i + 1] = (*(ptrSource + i) & 0xFF00) >> 8;  //高地址存放低字节
         //other.
         //*((u16*)User_DataBuffer.ucData + i) = ((*(ptrSource + i) & 0xFF00)) | (*(ptrSource + i) & 0xFF);
@@ -209,6 +209,11 @@ void RTU_Master::master(u8 ucNodeAddr, bool bMode_RW, u16 usDataAddr, u16 usNum)
             masterFunc_0x01(ucNodeAddr, usDataAddr, usNum);
         }
     }
+    //主站状态
+    masterStatus.bErr       = RTU_PORT.portStatus.bErr;
+    masterStatus.usErrMsg   = RTU_PORT.portStatus.usErrMsg;
+    masterStatus.bTimeOut   = RTU_PORT.portStatus.bTimeOut;
+    masterStatus.unErrCount = RTU_PORT.portStatus.unErrCount;
 }
 
 //--------------------------------function code:0x10---------------------------------------------------
@@ -226,12 +231,12 @@ void RTU_Master::masterFunc_0x10(u8 ucNodeAddr, u16 usDataAddr, u16 usNum)
     enCode_0x10(ucNodeAddr, Addr, usNum);
     //发送
     RTU_PORT.SendFrame();
-       
+
     //发送后转入接收。
     RTU_PORT.ReceiveFrame();
     //应答超时监测使能。
     RTU_PORT.timeRespTimeOut_Start();
- 
+
 
     while((!RTU_PORT.portStatus.bReadEnb) && !RTU_PORT.portStatus.bErr);
 
@@ -323,7 +328,7 @@ void RTU_Master::masterFunc_0x03(u8 ucNodeAddr, u16 usDataAddr, u16 usNum)
     enCode_0x03(ucNodeAddr, Addr, usNum);
     //发送
     RTU_PORT.SendFrame();
-        
+
     //发送后转入接收。
     RTU_PORT.ReceiveFrame();
     //应答超时监测使能。
@@ -405,7 +410,7 @@ bool RTU_Master::unCode_0x03(u8 ucNodeAddr)
 //读AI:输入存储器
 void RTU_Master::masterFunc_0x04(u8 ucNodeAddr, u16 usDataAddr, u16 usNum)
 {
-    bool bUnCode = false;
+    bool bUnCode       = false;
     masterStatus.bDone = false;
     //元件基址:3xxxx
     u16 Addr = usDataAddr - 30000;
@@ -494,7 +499,7 @@ bool RTU_Master::unCode_0x04(u8 ucNodeAddr)
 //读多个连续的输入离散量DI
 void RTU_Master::masterFunc_0x02(u8 ucNodeAddr, u16 usDataAddr, u16 usNum)
 {
-    bool bUnCode = false;
+    bool bUnCode       = false;
     masterStatus.bDone = false;
     //元件基址:1xxxx
     u16 Addr = usDataAddr - 10000;
@@ -639,7 +644,7 @@ bool RTU_Master::enCode_0x0F(u8 ucNodeAddr, u16 usDataAddr, u16 usNum)
     RTU_PORT.usTXIndex = j;
     CRC16 = RTU_PORT.CRC16Gen();
     //添加CRC16,低字节在前
-    RTU_PORT.TXBuffer[j] = CRC16;
+    RTU_PORT.TXBuffer[j]   = CRC16;
     RTU_PORT.TXBuffer[j+1] = CRC16 >> 8;
     //帧长度字节数。
     RTU_PORT.usTXIndex = j + 2;
@@ -762,7 +767,7 @@ void RTU_Master::judge(char* ptrFunCode, bool bUnCode)
         //如果返回数据不符。
         if(!bUnCode)
         {
-            masterStatus.bErr = true;
+            masterStatus.bErr     = true;
             masterStatus.usErrMsg = 1;
             printf("%s返回帧含出错信息或不是所需从站返回帧 \n\n\n\n", ptrFunCode);
             Usart_SendFrame(USART1, User_DataBuffer.ucData, User_DataBuffer.usIndex);
@@ -777,9 +782,9 @@ void RTU_Master::judge(char* ptrFunCode, bool bUnCode)
         }
     }
     //如果出错：CRC校验失败。
-    else if(RTU_PORT.portStatus.bErr && RTU_PORT.portStatus.usErr == 2)
+    else if(RTU_PORT.portStatus.bErr && RTU_PORT.portStatus.usErrMsg == 2)
     {
-        masterStatus.bErr = true;
+        masterStatus.bErr     = true;
         masterStatus.usErrMsg = 2;
         printf("%s返回帧CRC16校验失败！\n", ptrFunCode);
         //打印帧数据
@@ -790,7 +795,7 @@ void RTU_Master::judge(char* ptrFunCode, bool bUnCode)
     //如果应答超时则不解析,处理下个事务（重发或进行下一帧发送）。
     else if(RTU_PORT.portStatus.bTimeOut)
     {
-        masterStatus.bErr = true;
+        masterStatus.bErr     = true;
         masterStatus.usErrMsg = 4;
         RTU_PORT.portStatus.unErrCount++;//通讯错误次数统计。
         printf("%s接收超时!\n", ptrFunCode);

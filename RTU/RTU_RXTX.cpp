@@ -1,28 +1,16 @@
 /*********************************************************
-功能： Modbus RTU通讯的底层通讯实现
-描述： 对485端口的初始化以及Modbus通讯所需要的几个定时器的初始化。
-设计： azjiao
-版本： 0.1
-日期： 2018年10月08日
-*********************************************************/
+  功能： Modbus RTU通讯的底层通讯实现
+  描述： 对485端口的初始化以及Modbus通讯所需要的几个定时器的初始化。
+  设计： azjiao
+  版本： 0.1
+  日期： 2018年10月08日
+ *********************************************************/
 #include <stdio.h>
 #include "dev.h"
 #include "RTU_RXTX.h"
 
 //公共RTU_DataCtrl 实例
 RTU_DataCtrl Neo_RTUPort;
-
-//Port_RS485构造函数：给端口初始化数据赋值。
-Port_RS485::Port_RS485(u32 unBR, u16 usDB, u16 usSB, u16 usPt)
-{
-    setPortParam(unBR, usDB, usSB, usPt);
-}
-
-//修改端口号.
-void Port_RS485::setPortNo(u8 ucPNo)
-{
-    ucPortNo = ucPNo;
-}
 
 //修改端口初始化数据.
 void Port_RS485::setPortParam(u32 unBR, u16 usDB, u16 usSB, u16 usPt)
@@ -100,7 +88,7 @@ void Port_RS485::configCommParam(void)
         My_USART_Init(USART2, RS485Init.unBaudRate, RS485Init.usDataBit, RS485Init.usStopBit, RS485Init.usParity, USART_Mode_Rx | USART_Mode_Tx);
 
         //配置USART2中断优先级
-        My_NVIC_Init(USART2_IRQn, 2, 2, ENABLE);
+        My_NVIC_Init(USART2_IRQn, 1, 1, ENABLE);
         //使能串口2接收中断
         USART_ITConfig(USART2, USART_IT_RXNE,ENABLE);
         //使能串口2
@@ -118,10 +106,12 @@ void Port_RS485::RS485_Init(void)
 //---------------------------------------------------------------------------
 //Port_RTU构造函数
 Port_RTU::Port_RTU(u32 unBR, u16 usDB, u16 usSB, u16 usPt) : \
-            Port_RS485(unBR, usDB, usSB, usPt), \
-            ucT15_35No(6), ucTrespNo(7)
+        Port_RS485(unBR, usDB, usSB, usPt), \
+        ucT15_35No(6), ucTrespNo(6)
 {
     float fOneByteTime;  //一个字节发送的时间(us)。
+    bSameTimer = (ucT15_35No == ucTrespNo)? true: false;
+
     u32 unBaudRate = getBaudRate();
     //根据波特率计算一个字节发送的时间。
     if(unBaudRate <= 19200)
@@ -129,17 +119,27 @@ Port_RTU::Port_RTU(u32 unBR, u16 usDB, u16 usSB, u16 usPt) : \
     else
         fOneByteTime = 1750; //只有波特率大于19200时才使用固定定时。
 
-    usT15_us = 1.5 * fOneByteTime;  //t1.5定时时间us.
-    usT35_us = 3.5 * fOneByteTime;  //t3.5定时时间us.
-    usTresponse_ms = usTimeOut;  //超时定时值(500)ms.
-    T15_35.setProperty(ucT15_35No, usT35_us, bUnitus);    //以t3.5工作，取消了字节流监测。    
-    Trespond.setProperty(ucTrespNo, usTresponse_ms, bUnitms);
+    //usT15_us = 1.5 * fOneByteTime;  //t1.5定时时间us.
+    unT35_us = 3.5 * fOneByteTime;  //t3.5定时时间us.
+    unTresponse_us = TIMEOUTVAL * 1000;  //超时定时值(500)ms.
+
+    T15_35.setProperty(ucT15_35No, unT35_us, bUNITUS, 0, 3);    //以t3.5工作，取消了字节流监测。
+    if(bSameTimer)
+    {
+        Trespond.setProperty(ucTrespNo, unTresponse_us, bUNITUS, 0, 3); //超时监测和帧结束监测使用同一个定时器。
+    }
+    else
+    {
+        Trespond.setProperty(ucTrespNo, unTresponse_us, bUNITUS, 0, 4); //超时监测和帧结束监测使用同一个定时器。
+    }
+
+
 }
 
 //静态成员定时器的初始化
 //使用缺省构造函数，没有初始化定时器属性。
-BaseTimer Port_RTU::T15_35;
-BaseTimer Port_RTU::Trespond;
+//BaseTimer Port_RTU::T15_35;
+//BaseTimer Port_RTU::Trespond;
 
 //RTU端口通讯初始化.
 void Port_RTU::portRTU_Init(void)
@@ -148,31 +148,16 @@ void Port_RTU::portRTU_Init(void)
     RS485_Init();
 
     //设置T15_35,本设计不监测字节流，只监测帧结束和应答超时。所以T15_35定时器以t3.5方式工作,(第四参数缺省)暂不启动定时器.
- //   T15_35.Timer_Init(ucT15_35No, usT35_us, bUnitus);
-    //FixME:由于已经在构造函数中初始化过定时器属性，可以使用如下初始化定时器。(简化初始化，只在一处进行属性设置，避免无谓的错误。)
-    //由于共用定时器，下次需要使用时必须首先初始化。
- //   T15_35.timer_Init(bTimerStop);
-    //设置Trespond,(第四参数缺省)暂不启动定时器.
- //   Trespond.Timer_Init(ucTrespNo, usTresponse_ms, bUnitms);
-    //FixME:由于已经在构造函数中初始化过定时器属性，可以使用如下初始化定时器。
-    //采用TIM6作为帧结束监测和应答超时定时器，首先使用的是t3.5，所以暂不对应答超时进行初始化。
-    //当需要使用超时定时器时先进行初始化。
-    //Trespond.timer_Init(bTimerStop);
-    
-    
+    //   T15_35.Timer_Init(ucT15_35No, usT35_us, bUnitus);
+    T15_35.timer_Init(bTIMERSTOP);
+    //如果使用同一个定时器硬件，则不用重复初始化。
+    if(!bSameTimer)
+        Trespond.timer_Init(bTIMERSTOP);
     //默认为接收模式
     RS485_RX();
 }
 
 //------------------------------------------------------------------------------------------------
-//RTU_DataCtrl构造函数
-RTU_DataCtrl::RTU_DataCtrl(u32 unBR, u16 usDB, u16 usSB, u16 usPt) : \
-                   Port_RTU(unBR, usDB,usSB, usPt)
-{
-    //清空数据缓冲区.
-    usRXIndex = usTXIndex = 0;
-}
-
 
 //CRC16校验码生成
 //待校验数据为发送缓冲区数据.
@@ -252,9 +237,9 @@ void RTU_DataCtrl::SendFrame(void)
     }
     //等待全部连续数据发送完毕。
     while(USART_GetFlagStatus(USART2, USART_FLAG_TC) != SET);
+
     //帧间延时，开启t3.5。
     //延时结束会使bBusy复位。
-    //T15_35.timer_ResetONOFF(bTimerStart);    
     timeFrameEnd_Start();
     //等待帧间隔结束。
     while(portStatus.bBusy);
