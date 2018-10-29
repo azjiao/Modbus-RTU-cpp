@@ -41,7 +41,7 @@ int main(void)
     Usart1_Init(19200);    
 
     printf("in main....\r\n");
-    Iwdg_Init(4, 625);  //独立看门狗初始化：预分频系数4对应64，RLR值为625，这样看门狗定时1s。
+    
 
 #if (MASTERORSLAVE == bMaster)
     
@@ -74,7 +74,7 @@ int main(void)
 
 
     bool bTComm_Act = true;            
-        
+    Iwdg_Init(4, 625);  //独立看门狗初始化：预分频系数4对应64，RLR值为625，这样看门狗定时1s。    
     while(1)
     {                
         TimeON(bTComm_Act, 500U, &timer_RTU_Comm);     
@@ -102,7 +102,7 @@ int main(void)
 
 #else
 
-
+    Iwdg_Init(4, 625);  //独立看门狗初始化：预分频系数4对应64，RLR值为625，这样看门狗定时1s。
     myProtocol1.slave_Init();
     while(1)
     {

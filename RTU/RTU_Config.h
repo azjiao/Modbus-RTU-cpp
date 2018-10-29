@@ -26,7 +26,7 @@ const u16 STOPBIT  = 1;  //停止位
 const u16 PARITY   = 0;  //奇偶校验：0无校验，1奇校验，2偶校验
 //从站应答超时时间,单位ms.最大范围为655ms。
 //使用TIM6做应答超时定时器，和帧结束共用一个定时器。
-const u16 TIMEOUTVAL = 400;
+const u16 TIMEOUTVAL = 500;
 
 
 //定义中断服务中使用的RTU_DataCtrl实例的别名:如果RTU_DataCtrl的实例名改变，请一并改变这里的Neo_RTUPort为所需。
