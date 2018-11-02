@@ -135,21 +135,12 @@ void TIM7_IRQHandler(void)
         if(iStep == 1)
         {
             myNeo_Master.master(4, bRead, 40000, 10);
-//            if(RTU_PORT_ALIAS.portStatus.bErr)
-//                printf("Err!--> iCount = %d,iStep = %d.\tbErr=%d,usErrMsg=%d\r\n", iCount, iStep, RTU_PORT_ALIAS.portStatus.bErr, RTU_PORT_ALIAS.portStatus.usErrMsg);
-
-            //如果通讯完成或通讯出错都转入下一步。
-            //if(myNeo_Master.masterStatus.bDone || myNeo_Master.masterStatus.bErr)
-            //执行master要么done要么出错，都会执行完毕，所以没有必要检测。
             iStep = 2;
         }
         else if(iStep == 2)
         {
             myNeo_Master.read32bitData_BMode((u32*)usDataTemp, 5);//测试结果：slave采用的是大端模式，也就是按照协议要求显示。
             myNeo_Master.master(4, bWrite, 40020, 10);
-//            if(RTU_PORT_ALIAS.portStatus.bErr)
-//                printf("Err!--> iCount = %d,iStep = %d.\tbErr=%d,usErrMsg=%d\r\n", iCount, iStep, RTU_PORT_ALIAS.portStatus.bErr, RTU_PORT_ALIAS.portStatus.usErrMsg);
-            //if(myNeo_Master.masterStatus.bDone || myNeo_Master.masterStatus.bErr)
             iStep = 1;
         }
 

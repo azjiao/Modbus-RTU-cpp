@@ -63,16 +63,6 @@ int main(void)
 
     }
 
-    printf("\r\n");
-    int iErr = Neo_RTUPort.portStatus.unErrCount;
-    printf("count of err is:%d\r\n", iErr);
-    printf("-----------------------------\r\n");
-    printf("向缓冲区写入小端数据：\r\n");
-    //myProtocol2.write16bitData_LMode((u16*)usDataTemp,50);
-    myProtocol2.write32bitData_LMode((u32*)usDataTemp,50);
-    myProtocol2.printBuff();//总是以大端模式存储。
-
-
     bool bTComm_Act = true;            
     Iwdg_Init(4, 625);  //独立看门狗初始化：预分频系数4对应64，RLR值为625，这样看门狗定时1s。    
     while(1)

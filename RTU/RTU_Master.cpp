@@ -243,7 +243,7 @@ void RTU_Master::masterFunc_0x10(u8 ucNodeAddr, u16 usDataAddr, u16 usNum)
     if(RTU_PORT.portStatus.bReadEnb)
         bUnCode = unCode_0x10(ucNodeAddr);
 
-    judge("F0x10", bUnCode);
+    judge((char*)"F0x10", bUnCode);
 }
 
 
@@ -340,7 +340,7 @@ void RTU_Master::masterFunc_0x03(u8 ucNodeAddr, u16 usDataAddr, u16 usNum)
     if(RTU_PORT.portStatus.bReadEnb)
         bUnCode = unCode_0x03(ucNodeAddr);
 
-    judge("F0x03", bUnCode);
+    judge((char*)"F0x03", bUnCode);
 }
 
 //Function:0x03
@@ -430,7 +430,7 @@ void RTU_Master::masterFunc_0x04(u8 ucNodeAddr, u16 usDataAddr, u16 usNum)
     if(RTU_PORT.portStatus.bReadEnb)
         bUnCode = unCode_0x04(ucNodeAddr);
 
-    judge("F0x04", bUnCode);
+    judge((char*)"F0x04", bUnCode);
 }
 
 //±àÂë0x04
@@ -519,7 +519,7 @@ void RTU_Master::masterFunc_0x02(u8 ucNodeAddr, u16 usDataAddr, u16 usNum)
     if(RTU_PORT.portStatus.bReadEnb)
         bUnCode = unCode_0x02(ucNodeAddr);
 
-    judge("F0x02", bUnCode);
+    judge((char*)"F0x02", bUnCode);
 }
 
 //±àÂë0x02
@@ -607,7 +607,7 @@ void RTU_Master::masterFunc_0x0F(u8 ucNodeAddr, u16 usDataAddr, u16 usNum)
     if(RTU_PORT.portStatus.bReadEnb)
         bUnCode = unCode_0x0F(ucNodeAddr);
 
-    judge("F0x0F", bUnCode);
+    judge((char*)"F0x0F", bUnCode);
 }
 
 //±àÂë
@@ -698,7 +698,7 @@ void RTU_Master::masterFunc_0x01(u8 ucNodeAddr, u16 usDataAddr, u16 usNum)
     if(RTU_PORT.portStatus.bReadEnb)
         bUnCode = unCode_0x01(ucNodeAddr);
 
-    judge("F0x01", bUnCode);
+    judge((char*)"F0x01", bUnCode);
 }
 
 //±àÂë

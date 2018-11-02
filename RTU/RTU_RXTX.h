@@ -100,7 +100,7 @@ class Port_RTU : Port_RS485
         void timeRespTimeOut_Start(void)
         {
             Trespond.timer_ResetONOFF(bTIMERSTART);
-            ucWhichTimer = FRAMEEND_TIMERRUN;
+            ucWhichTimer = TIMEOUT_TIMERRUN;
         }
 
         void timeRespTimeOut_Stop(void)
