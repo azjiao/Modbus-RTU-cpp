@@ -3,6 +3,7 @@
 #include "dev.h"
 #include "RTU_Master.h"
 #include "RTU_Config.h"
+#include <stdio.h>
 
 //本文件是作为主站时的中断函数。
 #if MASTERORSLAVE == bMaster
@@ -20,38 +21,64 @@ void USART2_IRQHandler(void)
     {
         LED1_ON;
         //复位应答超时定时器并停止工作。
-        RTU_PORT_ALIAS.timeRespTimeOut_Stop();
-        RTU_PORT_ALIAS.portStatus.bTimeOut = false;
+        //当超时时间远远大于数据接收时间，而超时定时器和帧结束定时器使用同一个定时器时，停止超时定时器显得无用了。
+        //这种情况下可以删除停止超时定时器的语句。
+        //RTU_PORT_ALIAS.timeRespTimeOut_Stop();
+        //RTU_PORT_ALIAS.portStatus.bTimeOut = false;
 
         //接收字节数据并自动清除中断标识.
         ucData                             = USART_ReceiveData(USART2);
         RTU_PORT_ALIAS.portStatus.bBusy    = true;  //忙
-        RTU_PORT_ALIAS.portStatus.bReadEnb = false; //帧不可读取。
-
-        //如果出现接收错误,则设置错误信息.
-        //本条语句可以删除，当出现错误时CRC16校验会通不过。
-        /*
-         *if(USART_GetFlagStatus(USART2, USART_FLAG_NE | USART_FLAG_FE | USART_FLAG_PE))
-         *{
-         *   RTU_PORT_ALIAS.portStatus.usErrMsg = 3;  //通讯接收错误
-         *   RTU_PORT_ALIAS.portStatus.bErr     = true;
-         *}
-         *else
-         *{
-         *    RTU_PORT_ALIAS.portStatus.bErr = false;
-         *}
-         */
+        RTU_PORT_ALIAS.portStatus.bReadEnb = false; //帧不可读取。  
+        //当第一次接收到数据字节并停止了超时定时器后就失能接收中断。
+        //USART_ITConfig(USART2, USART_IT_RXNE,DISABLE);
+        //printf("in rxne\r\n");
 
         //如果字节接收无错则接收转储数据,并重新启动t3.5定时器.
         //否则，则不储存数据到接收缓冲区，将导致CRC校验错误，也会让最终结果错误。
-       if(!RTU_PORT_ALIAS.portStatus.bErr)
-        {
-            //转储接收到的字节数据.
-            RTU_PORT_ALIAS.saveAData(ucData);
-            //复位并重新启动t3.5定时器,监测数据帧是否结束.
-            RTU_PORT_ALIAS.timeFrameEnd_Start();
-        }
+       
+        //转储接收到的字节数据.
+        RTU_PORT_ALIAS.saveAData(ucData);
+        //RTU_PORT_ALIAS.usRXIndex++;
+        //复位并重新启动t3.5定时器,监测数据帧是否结束.
+        RTU_PORT_ALIAS.timeFrameEnd_Start();
+
     }
+    /*
+    //串口2空闲：一帧通讯结束。
+    if(USART_GetITStatus(USART2, USART_IT_IDLE) == SET)
+    {
+        u8 dataTmp;
+        dataTmp = USART2->SR;
+        dataTmp = USART2->DR;
+        
+        //确定接收到的字节数量。     
+        RTU_PORT_ALIAS.usRXIndex = FRAME_MAXLEN - DMA_GetCurrDataCounter(DMA1_Channel6); 
+        
+        //判断数据帧的有效性.
+        //只对通讯数据帧本身作判断，也即CRC校验。
+        if(RTU_PORT_ALIAS.CRC16Check())
+        {
+            RTU_PORT_ALIAS.portStatus.bErr     = false;   //数据帧可读时bErr为false，所以可以取消对bErr的判断。
+            RTU_PORT_ALIAS.portStatus.bReadEnb = true;  //帧可读取。
+        }
+        //如果CRC失败，则丢弃本帧。
+        else
+        {
+            RTU_PORT_ALIAS.portStatus.unErrCount++;//通讯错误次数统计。
+            RTU_PORT_ALIAS.portStatus.bErr     = true;
+            RTU_PORT_ALIAS.portStatus.usErrMsg = 2; //CRC校验失败。
+            RTU_PORT_ALIAS.portStatus.bReadEnb = false;  //帧不可读。
+        }
+        //设置系统状态进入空闲.
+        RTU_PORT_ALIAS.portStatus.bBusy = false;
+        //LED1_OFF;
+        //重新设置DMA，使之可以重新传送到缓冲区开头。
+        DMA_Cmd(DMA1_Channel6, DISABLE );  //关闭USART1 TX DMA1 所指示的通道      
+        DMA_SetCurrDataCounter(DMA1_Channel6,FRAME_MAXLEN);//DMA通道的DMA缓存的大小
+        DMA_Cmd(DMA1_Channel6, ENABLE);  //使能USART1 TX DMA1 所指示的通道 
+    }
+    */
 }
 
 //TIM6即用于帧结束定时也用于接收超时监测。
@@ -72,6 +99,7 @@ void TIM6_IRQHandler(void)
             //当处于接收时校验CRC16.
             if(RTU_PORT_ALIAS.portStatus.bMode == RXMODE)
             {
+                
                 //printf("接收结束\r\n");
                 //判断数据帧的有效性.
                 //只对通讯数据帧本身作判断，也即CRC校验。
@@ -93,6 +121,7 @@ void TIM6_IRQHandler(void)
                 //设置系统状态进入空闲.
                 RTU_PORT_ALIAS.portStatus.bBusy = false;
                 LED1_OFF;
+                
             }
             //如果处于发送则不作校验。
             else
@@ -107,7 +136,7 @@ void TIM6_IRQHandler(void)
             RTU_PORT_ALIAS.portStatus.bErr     = true;
             RTU_PORT_ALIAS.portStatus.usErrMsg = 4;
             RTU_PORT_ALIAS.portStatus.bTimeOut = true;
-            //复位应答超时定时其并停止工作。
+            //复位应答超时定时器并停止工作。
             RTU_PORT_ALIAS.timeRespTimeOut_Stop();
             RTU_PORT_ALIAS.portStatus.bBusy = false;
         }

@@ -91,6 +91,9 @@ void Port_RS485::configCommParam(void)
         My_NVIC_Init(USART2_IRQn, 1, 1, ENABLE);
         //使能串口2接收中断
         USART_ITConfig(USART2, USART_IT_RXNE,ENABLE);
+        //使能串口2空闲中断
+        //USART_ITConfig(USART2, USART_IT_IDLE,ENABLE);
+        
         //使能串口2
         USART_Cmd(USART2, ENABLE);
     }
@@ -235,4 +238,29 @@ void RTU_DataCtrl::SendFrame(void)
 }
 
 
+//RS485口的DMA接收配置:由于需要使用接收缓冲区RXBuffer做DMA的目的，所以放在本类中而不是子类。
+void RTU_DataCtrl::portReceiveDMA_Config(void)
+{
+    DMA_InitTypeDef DMA_InitStructure;
+    //使能DMA1总线。
+    RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA1, ENABLE);
+    USART_DMACmd(USART2,USART_DMAReq_Rx,ENABLE);   //使能串口2 DMA接收
+    
+    DMA_DeInit(DMA1_Channel6);   //将DMA2的通道6寄存器重设为缺省值  串口2的接收对应的是DMA1通道6
+    DMA_InitStructure.DMA_PeripheralBaseAddr = (u32)&USART2->DR;  //DMA外设ADC基地址
+    //DMA_InitStructure.DMA_MemoryBaseAddr = (u32)RXBuffer;  //DMA内存基地址
+    DMA_InitStructure.DMA_MemoryBaseAddr = (u32)RXBuffer;  //DMA内存基地址
+    DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralSRC;  //数据传输方向，从外设读取发送到内存
+    DMA_InitStructure.DMA_BufferSize = FRAME_MAXLEN;  //DMA通道的缓存的大小
+    DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;  //外设地址寄存器不变
+    DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;  //内存地址寄存器递增
+    DMA_InitStructure.DMA_PeripheralDataSize = DMA_PeripheralDataSize_Byte;  //外设数据宽度为8位
+    DMA_InitStructure.DMA_MemoryDataSize = DMA_MemoryDataSize_Byte; //存储器数据宽度为8位
+    DMA_InitStructure.DMA_Mode = DMA_Mode_Normal;  //工作在正常缓存模式
+    DMA_InitStructure.DMA_Priority = DMA_Priority_Medium; //DMA通道拥有中优先级 
+    DMA_InitStructure.DMA_M2M = DMA_M2M_Disable;  //DMA通道x没有设置为内存到内存传输
+    DMA_Init(DMA1_Channel6, &DMA_InitStructure);  //根据DMA_InitStruct中指定的参数初始化DMA的通道:DMA1的通道6，即为USART2_RX。
+            
+    DMA_Cmd(DMA1_Channel6, ENABLE);  //正式驱动DMA传输
+}
 

@@ -62,7 +62,7 @@ int main(void)
     CommTimer.timer_Init(bTIMERSTART);
     
     bool bTComm_Act = true;            
-    Iwdg_Init(4, 625);  //独立看门狗初始化：预分频系数4对应64，RLR值为625，这样看门狗定时1s。    
+   // Iwdg_Init(4, 625);  //独立看门狗初始化：预分频系数4对应64，RLR值为625，这样看门狗定时1s。    
     while(1)
     {                
         TimeON(bTComm_Act, 500U, &timer_RTU_Comm);     
@@ -75,7 +75,7 @@ int main(void)
         {          
             bTComm_Act = false;
             if(myProtocol2.masterStatus.bErr)
-                printf("通讯出错！出错次数=%d\r\n,上次出错代码=%d", myProtocol2.masterStatus.unErrCount, myProtocol2.masterStatus.usErrMsg);
+                printf("通讯出错！出错次数=%d\r\n,上次出错代码=%d\r\n", myProtocol2.masterStatus.unErrCount, myProtocol2.masterStatus.usErrMsg);
             
             for(int i = 0; i < 5; i++)
             {
@@ -83,7 +83,7 @@ int main(void)
             }
             printf("\r\n");           
         }
-        Iwdg_Feed();
+      //  Iwdg_Feed();
     }
 
 

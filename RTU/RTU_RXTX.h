@@ -149,6 +149,8 @@ class RTU_DataCtrl : public Port_RTU
             portStatus.bMode    = TXMODE;  //处于发送状态.
             portStatus.bBusy    = true;  //设置系统状态进入空闲.
         };
+        //RS485口的DMA接收配置:由于需要使用接收缓冲区RXBuffer做DMA的目的，所以放在本类中而不是子类。
+        void portReceiveDMA_Config(void);
     public:
         RTU_DataCtrl(u32 unBR = BAUDRATE, u16 usDB = DATABIT, u16 usSB = STOPBIT, u16 usPt = PARITY): \
             Port_RTU(unBR, usDB,usSB, usPt), \
@@ -168,6 +170,7 @@ class RTU_DataCtrl : public Port_RTU
         void RTU_Init(u32 unBR = BAUDRATE, u16 usDB = DATABIT, u16 usSB = STOPBIT, u16 usPt = PARITY)
         {
             portRTU_Init(unBR, usDB, usSB, usPt);  //使用子类接口初始化端口.
+           // portReceiveDMA_Config();  //初始化485口的接收DMA。
         };
         u16  CRC16Gen(void);  //默认使用TXBuffer作为生成校验码的数据.
         bool CRC16Check(void);  //默认使用RXBuffer作为检查校验码是否正确的数据.
