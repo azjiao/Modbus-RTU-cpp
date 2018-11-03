@@ -90,9 +90,9 @@ void Port_RS485::configCommParam(void)
         //配置USART2中断优先级
         My_NVIC_Init(USART2_IRQn, 1, 1, ENABLE);
         //使能串口2接收中断
-        USART_ITConfig(USART2, USART_IT_RXNE,ENABLE);
+        //USART_ITConfig(USART2, USART_IT_RXNE,ENABLE);
         //使能串口2空闲中断
-        //USART_ITConfig(USART2, USART_IT_IDLE,ENABLE);
+        USART_ITConfig(USART2, USART_IT_IDLE,ENABLE);
         
         //使能串口2
         USART_Cmd(USART2, ENABLE);
@@ -210,6 +210,10 @@ void RTU_DataCtrl::ReceiveFrame(void)
     resetStatus4RX();
     //设置端口处于接收使能状态.
     RS485_RX();
+
+    //由于采用DMA接收数据，不采用串口接收中断，不能在串口中断中点亮LED1，所以在此点亮。
+    //在串口空闲中断和超时中断中关闭LED1.
+    LED1_ON;
 }
 
 //发送数据帧

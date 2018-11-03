@@ -33,7 +33,6 @@ typedef struct
 //modbus通讯状态字
 typedef  struct
 {
-    bool bMode;  //处于TXMODE:发送模式,还是RXMODE:接收状态.
     bool bReadEnb; //接收到的帧可读取标识。0：不可读取；1：可读取。
     bool bBusy;         //忙。对于接收，接收开始不一定忙。
     bool bErr;          //接收帧有错误.
@@ -136,9 +135,8 @@ class RTU_DataCtrl : public Port_RTU
         {
             portStatus.bReadEnb = false;  //复位数据可读取标识。
             portStatus.bErr     = false;
-            portStatus.bTimeOut = false;
-            portStatus.bMode    = RXMODE;  //处于接收状态,以便在接收一帧后校验CRC.
-            portStatus.bBusy    = false;  //设置系统状态进入空闲.
+            portStatus.bTimeOut = false;           
+            portStatus.bBusy    = true;  //设置系统状态进入忙.
         };
         //复位状态字准备发送数据帧
         void resetStatus4TX(void)
@@ -146,8 +144,7 @@ class RTU_DataCtrl : public Port_RTU
             portStatus.bReadEnb = false;  //复位数据可读取标识。
             portStatus.bErr     = false;
             portStatus.bTimeOut = false;
-            portStatus.bMode    = TXMODE;  //处于发送状态.
-            portStatus.bBusy    = true;  //设置系统状态进入空闲.
+            portStatus.bBusy    = true;  //设置系统状态进入忙.
         };
         //RS485口的DMA接收配置:由于需要使用接收缓冲区RXBuffer做DMA的目的，所以放在本类中而不是子类。
         void portReceiveDMA_Config(void);
@@ -170,7 +167,7 @@ class RTU_DataCtrl : public Port_RTU
         void RTU_Init(u32 unBR = BAUDRATE, u16 usDB = DATABIT, u16 usSB = STOPBIT, u16 usPt = PARITY)
         {
             portRTU_Init(unBR, usDB, usSB, usPt);  //使用子类接口初始化端口.
-           // portReceiveDMA_Config();  //初始化485口的接收DMA。
+            portReceiveDMA_Config();  //初始化485口的接收DMA。
         };
         u16  CRC16Gen(void);  //默认使用TXBuffer作为生成校验码的数据.
         bool CRC16Check(void);  //默认使用RXBuffer作为检查校验码是否正确的数据.

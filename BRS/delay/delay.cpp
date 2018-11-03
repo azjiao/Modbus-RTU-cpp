@@ -38,6 +38,7 @@ void delay_s(u32 utime_s)
 // 当bEnb为true时开始定时，定时单位为1ms。
 // 当bEnb为false时复位定时器。
 // 当定时到达后如果没有复位定时器则定时器当前计数值uEt保持不变。
+// FIXME:必须保证TimeON()执行的频次比SysTick中断高才有精度保证。需要后续改进。
 bool TimeON(bool bEnb, u32 uPt, TimerType *timer)
 {
     if(!bEnb){
