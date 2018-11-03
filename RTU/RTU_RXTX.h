@@ -75,7 +75,6 @@ class Port_RTU : Port_RS485
 
         BaseTimer T15_35;    //t1.5和t3.5共用定时器.
         BaseTimer Trespond;  //超时定时器.
-        bool bSameTimer;    //t1.5_t3.5使用同一个定时器的标识：当ucT15_35和ucTrespNo一样时bSameTimer为true;
         u8 ucWhichTimer;            //目前是哪个定时器工作：FRAMEEND_TIMERRUN帧结束监测器还是FRAMEEND_TIMERRUN超时监测器？
 
     public:
@@ -92,7 +91,6 @@ class Port_RTU : Port_RS485
             portRTU_Init();
         };
 
-        bool getSameTimer(){return bSameTimer;}
         //查询哪个定时器工作？
         u8 whichTimerRun() {return ucWhichTimer;};
 
@@ -155,7 +153,7 @@ class RTU_DataCtrl : public Port_RTU
         RTU_DataCtrl(u32 unBR = BAUDRATE, u16 usDB = DATABIT, u16 usSB = STOPBIT, u16 usPt = PARITY): \
             Port_RTU(unBR, usDB,usSB, usPt), \
             usRXIndex(0),usTXIndex(0) {};
-
+        
         ~RTU_DataCtrl(){};
 
         //数据缓冲区

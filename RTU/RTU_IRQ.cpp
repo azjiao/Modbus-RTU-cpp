@@ -4,6 +4,7 @@
 #include "RTU_Master.h"
 #include "RTU_Config.h"
 
+//本文件是作为主站时的中断函数。
 #if MASTERORSLAVE == bMaster
 
 #ifdef __cplusplus
@@ -28,17 +29,20 @@ void USART2_IRQHandler(void)
         RTU_PORT_ALIAS.portStatus.bReadEnb = false; //帧不可读取。
 
         //如果出现接收错误,则设置错误信息.
-        if(USART_GetFlagStatus(USART2, USART_FLAG_NE | USART_FLAG_FE | USART_FLAG_PE))
-        {
-           RTU_PORT_ALIAS.portStatus.usErrMsg = 3;  //通讯接收错误
-           RTU_PORT_ALIAS.portStatus.bErr     = true;
-        }
-        else
-        {
-            RTU_PORT_ALIAS.portStatus.bErr = false;
-        }
+        //本条语句可以删除，当出现错误时CRC16校验会通不过。
+        /*
+         *if(USART_GetFlagStatus(USART2, USART_FLAG_NE | USART_FLAG_FE | USART_FLAG_PE))
+         *{
+         *   RTU_PORT_ALIAS.portStatus.usErrMsg = 3;  //通讯接收错误
+         *   RTU_PORT_ALIAS.portStatus.bErr     = true;
+         *}
+         *else
+         *{
+         *    RTU_PORT_ALIAS.portStatus.bErr = false;
+         *}
+         */
 
-        //如果字节接收无错且接收缓冲区没有越限则接收转储数据,并重新启动t3.5定时器.
+        //如果字节接收无错则接收转储数据,并重新启动t3.5定时器.
         //否则，则不储存数据到接收缓冲区，将导致CRC校验错误，也会让最终结果错误。
        if(!RTU_PORT_ALIAS.portStatus.bErr)
         {
@@ -50,23 +54,20 @@ void USART2_IRQHandler(void)
     }
 }
 
-//t3.5定时器中断服务函数。
-//t1.5用于监测字节接收是否超时,这个版本取消字节连续性监测。
-//t3.5用于监测帧是否结束.
-//但t3.5即用于接收监测帧结束也用于发送帧间延时.
-//如果发生t3.5中断则表示接收帧结束或帧发送结束,转入空闲状态.
+//TIM6即用于帧结束定时也用于接收超时监测。
+//当用于帧结束定时时，即用于发送结束的附加帧间延时，也用于接收时检测帧是否结束。
 void TIM6_IRQHandler(void)
 {
     if(TIM_GetITStatus(TIM6, TIM_IT_Update) == SET)
     {
-        //复位t3.5定时器并失能,停止定时监测.
+        //复位t3.5定时器并停止定时监测.
         RTU_PORT_ALIAS.timeFrameEnd_Stop();
 
-        //如果帧可读，等待处理帧时不再接收数据，把模式改为发送,以免接收到的数据被添加到帧末造成问题。
+        //等待处理帧时不再接收数据，把模式改为发送,以免接收到的数据被添加到帧末造成问题。
         RTU_PORT_ALIAS.RS485_TX();  //发送使能
 
         // 当帧结束监测器工作时：
-        if(!RTU_PORT_ALIAS.getSameTimer() || (RTU_PORT_ALIAS.getSameTimer() && (RTU_PORT_ALIAS.whichTimerRun() == FRAMEEND_TIMERRUN)))
+        if(RTU_PORT_ALIAS.whichTimerRun() == FRAMEEND_TIMERRUN)
         {
             //当处于接收时校验CRC16.
             if(RTU_PORT_ALIAS.portStatus.bMode == RXMODE)
@@ -101,7 +102,7 @@ void TIM6_IRQHandler(void)
             }
         }
         //当超时监测器工作时：
-        else if(RTU_PORT_ALIAS.getSameTimer() && (RTU_PORT_ALIAS.whichTimerRun() == TIMEOUT_TIMERRUN))
+        else if(RTU_PORT_ALIAS.whichTimerRun() == TIMEOUT_TIMERRUN)
         {
             RTU_PORT_ALIAS.portStatus.bErr     = true;
             RTU_PORT_ALIAS.portStatus.usErrMsg = 4;

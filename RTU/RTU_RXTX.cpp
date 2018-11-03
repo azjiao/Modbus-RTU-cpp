@@ -105,13 +105,12 @@ void Port_RS485::RS485_Init(void)
 
 //---------------------------------------------------------------------------
 //Port_RTU构造函数
+//ucT15_35No 和ucTrespNo使用同一个定时器TIM6,不可变。
 Port_RTU::Port_RTU(u32 unBR, u16 usDB, u16 usSB, u16 usPt) : \
         Port_RS485(unBR, usDB, usSB, usPt), \
         ucT15_35No(6), ucTrespNo(6)
 {
     float fOneByteTime;  //一个字节发送的时间(us)。
-    bSameTimer = (ucT15_35No == ucTrespNo)? true: false;
-
     u32 unBaudRate = getBaudRate();
     //根据波特率计算一个字节发送的时间。
     if(unBaudRate <= 19200)
@@ -124,16 +123,8 @@ Port_RTU::Port_RTU(u32 unBR, u16 usDB, u16 usSB, u16 usPt) : \
     unTresponse_us = TIMEOUTVAL * 1000;  //超时定时值(500)ms.
 
     T15_35.setProperty(ucT15_35No, unT35_us, bUNITUS, 0, 3);    //以t3.5工作，取消了字节流监测。
-    if(bSameTimer)
-    {
-        Trespond.setProperty(ucTrespNo, unTresponse_us, bUNITUS, 0, 3); //超时监测和帧结束监测使用同一个定时器。
-    }
-    else
-    {
-        Trespond.setProperty(ucTrespNo, unTresponse_us, bUNITUS, 0, 4); //超时监测和帧结束监测使用同一个定时器。
-    }
-
-
+    //帧结束和接收超时检测使用同一个定时器,只对Trespond属性进行初始化，设为同一优先级。
+    Trespond.setProperty(ucTrespNo, unTresponse_us, bUNITUS, 0, 3); //超时监测和帧结束监测使用同一个定时器。
 }
 
 //静态成员定时器的初始化
@@ -148,11 +139,8 @@ void Port_RTU::portRTU_Init(void)
     RS485_Init();
 
     //设置T15_35,本设计不监测字节流，只监测帧结束和应答超时。所以T15_35定时器以t3.5方式工作,(第四参数缺省)暂不启动定时器.
-    //   T15_35.Timer_Init(ucT15_35No, usT35_us, bUnitus);
     T15_35.timer_Init(bTIMERSTOP);
-    //如果使用同一个定时器硬件，则不用重复初始化。
-    if(!bSameTimer)
-        Trespond.timer_Init(bTIMERSTOP);
+    //使用同一个定时器硬件，则不用重复初始化Trespond。
     //默认为接收模式
     RS485_RX();
 }

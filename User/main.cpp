@@ -43,17 +43,9 @@ int main(void)
     printf("in main....\r\n");
     
 
-#if (MASTERORSLAVE == bMaster)
-    
-    //主站初始化。
-    myProtocol2.master_Init();
-    //通讯定时器初始化。
-    CommTimer.timer_Init(bTIMERSTART);    
-    
+#if (MASTERORSLAVE == bMaster)               
     printf("in main after master init....\r\n");
-
-    printf("OK!,myProtocol data is:\r\n");
-    
+    printf("OK!,myProtocol data is:\r\n");    
     printf("ucDataTemp的原始数据是：\r\n");
     for(int i = 0; i < 32; i++)
     {
@@ -62,7 +54,13 @@ int main(void)
         printf("0x%x\t", *(((u8*)&usDataTemp) +i));
 
     }
+    printf("\r\n");
 
+    //主站初始化。
+    myProtocol2.master_Init();
+    //通讯定时器初始化。
+    CommTimer.timer_Init(bTIMERSTART);
+    
     bool bTComm_Act = true;            
     Iwdg_Init(4, 625);  //独立看门狗初始化：预分频系数4对应64，RLR值为625，这样看门狗定时1s。    
     while(1)
