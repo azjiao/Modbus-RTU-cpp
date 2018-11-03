@@ -20,8 +20,10 @@ void USART2_IRQHandler(void)
     {
         LED1_ON;
         //复位应答超时定时器并停止工作。
-        RTU_PORT_ALIAS.timeRespTimeOut_Stop();
-        RTU_PORT_ALIAS.portStatus.bTimeOut = false;
+        //FIXME:当超时和帧结束使用同一个定时器时，当接收到一个字节后会启动帧结束检测定时器，也就自动终止了超时检测。
+        //这种情况下可以删除停止超时定时器的语句。
+        //RTU_PORT_ALIAS.timeRespTimeOut_Stop();
+        //RTU_PORT_ALIAS.portStatus.bTimeOut = false;
 
         //接收字节数据并自动清除中断标识.
         ucData                             = USART_ReceiveData(USART2);
