@@ -23,7 +23,7 @@ void assert_failed(uint8_t* file, uint32_t line)
     #include "RTU_Master.h"
     RTU_Master myProtocol2;
     static TimerType timer_RTU_Comm;
-    //使用TIM7作为定时通讯的定时器。每500ms通讯一次。
+    //使用TIM7作为定时通讯的定时器。每100ms通讯一次。
     BaseTimer CommTimer(7, 100, bUNITMS, 2, 1); 
     float usDataTemp[50] = {1236.45,4567.343,5932,9.0003}; //usDataTemp用于主站通讯中接收自和发送到从站的数据。
 #else
@@ -61,19 +61,29 @@ int main(void)
     //通讯定时器初始化。
     CommTimer.timer_Init(bTIMERSTART);
     
-    bool bTComm_Act = true;            
+    bool bTComm_Act = true; 
+    bool bt = true;
+     TON[0].uPt = 500;
    // Iwdg_Init(4, 625);  //独立看门狗初始化：预分频系数4对应64，RLR值为625，这样看门狗定时1s。    
     while(1)
     {                
-        TimeON(bTComm_Act, 500U, &timer_RTU_Comm);     
+        TimeON(bTComm_Act, 1000U, &timer_RTU_Comm);                   
         
         if(!bTComm_Act)
-            bTComm_Act = true;
-              
-        if(timer_RTU_Comm.bQ) 
+            bTComm_Act = true;                
+        
         //if(key0_Scan(false))
+        if(TimeONb(true, &bt, 10000U, 0))
+        {
+            bt = true; 
+            TimeONb(true, &bt, 10000U, 0);            
+            printf("TON \r\n");            
+        }
+
+        
+        if(timer_RTU_Comm.bQ)
         {          
-            bTComm_Act = false;
+            bTComm_Act = false;                                
             if(myProtocol2.masterStatus.bErr)
                 printf("通讯出错！出错次数=%d\r\n,上次出错代码=%d\r\n", myProtocol2.masterStatus.unErrCount, myProtocol2.masterStatus.usErrMsg);
             
@@ -81,8 +91,11 @@ int main(void)
             {
                 printf("%f\t", *(((float*)&usDataTemp) + i));
             }
-            printf("\r\n");           
+            printf("timer.bQ\r\n");           
         }
+        
+        
+        
       //  Iwdg_Feed();
     }
 

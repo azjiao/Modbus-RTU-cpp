@@ -4,6 +4,9 @@
 
 SysTick_TimerType Timer;
 
+//定义10个延时定时器。
+TimerType TON[SOFTTIMENUM];
+
 // 以1ms设置SysTick.
 void delay_Init(void)
 {
@@ -49,7 +52,7 @@ bool TimeON(bool bEnb, u32 uPt, TimerType *timer)
     }
     else{
         //if((timer->uEt < uPt) && ((Timer.bPlus_ms) & (Timer.bPlus_ms ^ timer->bTemp)))
-        //每次检测到边沿(每1ms翻转一次)就加1.        
+        //每次检测到边沿(每1ms翻转一次)就加1.
         if((timer->uEt < uPt) && (Timer.bPlus_ms ^ timer->bTemp))
             timer->uEt++;
 
@@ -64,6 +67,33 @@ bool TimeON(bool bEnb, u32 uPt, TimerType *timer)
             return false;
         }
     }
+}
+
+bool TimeONb(bool bEnb, bool* pbReset, u32 uPt, u8 ucTimerNo)
+{
+    if(ucTimerNo >= SOFTTIMENUM)
+        return false;
+    
+    TON[ucTimerNo].bEnb = bEnb;
+    TON[ucTimerNo].uPt = uPt; 
+    
+    if(!bEnb || (bEnb && *pbReset))
+    {
+        TON[ucTimerNo].uEt = 0U;
+        TON[ucTimerNo].bTemp = false;
+        TON[ucTimerNo].bQ = false; 
+        if (*pbReset)
+        {
+            *pbReset = false;
+        }
+            
+        return false;
+    }   
+    
+    if(TON[ucTimerNo].bQ)
+        return true;
+    else
+        return false;
 }
 
 //时间累计器
@@ -92,4 +122,4 @@ uint16_t TimeACC(bool bEnb, TimerType *timer)
 }
 
 
-        
+

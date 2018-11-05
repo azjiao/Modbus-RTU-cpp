@@ -19,6 +19,19 @@
 // 500us装载值是1ms装载值的一半。
 // 72000000/2000=36000.
 #define RELOAD_500US    SystemCoreClock/2000U
+//定时自定时定时器数量。
+#define SOFTTIMENUM 5
+
+
+
+// 脉冲型定时器结构
+typedef struct {
+    bool bEnb; //true:启动定时，false:停止定时并复位。
+    u32  uPt;  //定时器预置值：ms。
+    u32  uEt; // 定时计数当前值。
+    bool bTemp; //脉冲暂存信号。
+    bool bQ;    //定时时间到标识。
+}TimerType;
 
 // 延时器,配合SysTick使用。
 typedef struct {
@@ -26,13 +39,8 @@ typedef struct {
     bool bPlus_ms;  // ms脉冲信号,0.5msON,0.5msOFF.
 }SysTick_TimerType;
 
-// 脉冲型定时器结构
-typedef struct {
-    u32  uEt; // 定时计数当前值。
-    bool bTemp; //脉冲暂存信号。
-    bool bQ;    //定时时间到标识。
-}TimerType;
-
+//声明10个延时定时器。
+extern TimerType TON[SOFTTIMENUM];
 
 // 定时器初始化。
 void delay_Init(void);
@@ -47,7 +55,7 @@ void delay_s(u32 utime_s);
 // 当bEnb为FALSE时复位定时器。
 // 当定时到达后如果没有复位定时器则定时器当前计数值uEt保持不变。
 bool TimeON(bool bEnb, u32 uPt, TimerType *timer);
-
+bool TimeONb(bool bEnb, bool* pbReset, u32 uPt, u8 ucTimerNo);
 //时间累计器
 //当bEnb为TRUE时计时开始，时间单位为ms。
 //当bEnb为FALSE时复位计时器。
